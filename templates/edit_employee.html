@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Edit Data Karyawan</h2>
+<hr>
+
+<form method="POST" action="{{ url_for('edit_employee', employee_id=emp.id) }}">
+
+  <!-- NIK (read-only) -->
+  <div class="mb-3">
+    <label for="nik" class="form-label">NIK</label>
+    <input type="text" name="nik" id="nik" class="form-control" 
+           value="{{ emp.nik }}" readonly>
+  </div>
+  
+  <!-- Nama -->
+  <div class="mb-3">
+    <label for="name" class="form-label">Nama</label>
+    <input type="text" name="name" id="name" class="form-control" 
+           value="{{ emp.name }}" required>
+  </div>
+  
+  <!-- Posisi -->
+  <div class="mb-3">
+    <label for="position" class="form-label">Posisi/Jabatan</label>
+    <input type="text" name="position" id="position" class="form-control" 
+           value="{{ emp.position }}">
+  </div>
+
+  <!-- Phone -->
+  <div class="mb-3">
+    <label for="phone" class="form-label">No. HP</label>
+    <input type="text" name="phone" id="phone" class="form-control" 
+           value="{{ emp.phone }}">
+  </div>
+
+  <!-- Alamat -->
+  <div class="mb-3">
+    <label for="address" class="form-label">Alamat</label>
+    <input type="text" name="address" id="address" class="form-control" 
+           value="{{ emp.address }}">
+  </div>
+
+  <div class="mb-3">
+    <label for="no_rek" class="form-label">No Rekening</label>
+    <input type="text" name="no_rek" id="no_rek" class="form-control" 
+           value="{{ emp.no_rek }}">
+  </div>
+
+  <!-- Tanggal Masuk -->
+  <div class="mb-3">
+    <label for="hire_date" class="form-label">Tanggal Masuk Kerja</label>
+    <!-- Agar input date menampilkan value existing, format ke YYYY-MM-DD -->
+    <input type="date" name="hire_date" id="hire_date" class="form-control"
+       value="{% if emp.hire_date %}{{ emp.hire_date|strftime('%Y-%m-%d') }}{% endif %}">
+  </div>
+
+  <button type="submit" class="btn btn-success">
+    <i class="fa fa-save"></i> Simpan Perubahan
+  </button>
+  <a href="{{ url_for('employees') }}" class="btn btn-secondary">Batal</a>
+</form>
+{% endblock %}

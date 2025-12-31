@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-1"><i class="fa fa-cubes"></i> Komponen Karyawan</h3>
+    <div class="text-muted">{{ employee.name }} ({{ employee.nik }})</div>
+  </div>
+  <a href="{{ url_for('employees') }}" class="btn btn-outline-secondary">
+    <i class="fa fa-arrow-left"></i> Kembali
+  </a>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Tambah Komponen</div>
+  <div class="card-body">
+    <form method="post">
+      <div class="row g-3">
+        <div class="col-md-5">
+          <label class="form-label">Komponen</label>
+          <select name="component_id" class="form-select" required>
+            <option value="">-- pilih komponen --</option>
+            {% for c in components %}
+            <option value="{{ c.id }}">{{ c.name }} ({{ c.comp_type }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Nilai (opsional)</label>
+          <input type="number" step="0.01" name="value" class="form-control" placeholder="kosong = default">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Mulai Periode</label>
+          <input type="month" name="start_period" class="form-control">
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+          <button class="btn btn-primary w-100" type="submit"><i class="fa fa-plus"></i></button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Komponen Aktif</div>
+  <div class="card-body p-0">
+    <div class="table-responsive mb-0">
+      <table class="table table-striped align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nama</th>
+            <th>Tipe</th>
+            <th>Perhitungan</th>
+            <th>Nilai</th>
+            <th>Mulai</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in assigned %}
+          <tr>
+            <td>{{ a.component.name }}</td>
+            <td>{{ a.component.comp_type }}</td>
+            <td>{{ a.component.calc_type }}</td>
+            <td>{{ a.value if a.value is not none else a.component.default_value }}</td>
+            <td>{{ a.start_period or '-' }}</td>
+            <td>
+              {% if a.active %}
+                <span class="badge bg-success">Aktif</span>
+              {% else %}
+                <span class="badge bg-secondary">Nonaktif</span>
+              {% endif %}
+            </td>
+            <td>
+              <form action="{{ url_for('toggle_employee_component', assign_id=a.id) }}" method="post">
+                <button class="btn btn-sm btn-outline-primary">
+                  {% if a.active %}Nonaktifkan{% else %}Aktifkan{% endif %}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center">Belum ada komponen karyawan.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

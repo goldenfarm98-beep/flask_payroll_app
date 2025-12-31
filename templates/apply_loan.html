@@ -1,0 +1,28 @@
+{% extends 'base1.html' %}
+{% block content %}
+<h2>Ajukan Pinjaman Karyawan</h2>
+<hr>
+<!-- Tampilkan nama karyawan yang sedang login -->
+{% if employee %}
+<p>Selamat datang, <strong>{{ employee.name }}</strong></p>
+{% endif %}
+<form method="POST" action="{{ url_for('apply_loan') }}">
+  <div class="mb-3">
+    <label for="amount" class="form-label">Jumlah Pinjaman</label>
+    <input type="number" step="0.01" name="amount" id="amount" class="form-control" required>
+  </div>
+  <div class="mb-3">
+    <label for="tenor" class="form-label">Tenor (bulan)</label>
+    <input type="number" name="tenor" id="tenor" class="form-control" required>
+  </div>
+  <div class="mb-3">
+    <label for="interest_rate" class="form-label">Suku Bunga (%)</label>
+    <input type="number" step="0.01" name="interest_rate" id="interest_rate" class="form-control" value="0">
+  </div>
+  <div class="mb-3">
+    <label for="reason" class="form-label">Alasan Pengajuan</label>
+    <textarea name="reason" id="reason" class="form-control"></textarea>
+  </div>
+  <button type="submit" class="btn btn-primary">Ajukan Pinjaman</button>
+</form>
+{% endblock %}

@@ -1,0 +1,9 @@
+Flask==2.2.5
+Flask-SQLAlchemy==3.0.5
+Flask-Migrate==4.0.7
+SQLAlchemy==2.0.23
+Werkzeug==2.2.3
+pandas==2.2.0
+pdfkit==1.0.0
+pyarrow==15.0.2
+pytest

@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+  /* ====== Employees Desktop Polish ====== */
+  .page-header{
+    display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem;
+  }
+  .page-title{ display:flex; align-items:center; gap:.6rem; margin:0; font-weight:700; }
+  .card-elev{ border:0; box-shadow:0 8px 24px rgba(0,0,0,.06); border-radius:14px; }
+  .card-elev .card-header{
+    background:linear-gradient(135deg,#0d6efd 0%,#39a7ff 100%); color:#fff; font-weight:600;
+    border-top-left-radius:14px; border-top-right-radius:14px;
+  }
+  .input-group-text{ background:#f1f5f9; }
+  .table-wrap{ border-radius:14px; overflow:hidden; box-shadow:0 10px 24px rgba(0,0,0,.06); }
+  .table-sticky thead th{ position:sticky; top:0; z-index:2; background:#f8fafc; }
+  .table-sticky tbody tr:hover{ background:#f6fbff; }
+  .table td,.table th{ vertical-align:middle; }
+  .nowrap{ white-space:nowrap; }
+  .search-hint{ font-size:.85rem; color:#6b7280; }
+  .badge-empty{ color:#64748b; background:#e2e8f0; }
+</style>
+
+<div class="page-header">
+  <h2 class="page-title">
+    <i class="fa fa-users text-primary"></i> Data Karyawan
+  </h2>
+
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('employees_archive') }}" class="btn btn-outline-secondary">
+      <i class="fa fa-archive"></i> Arsip Karyawan
+    </a>
+
+  <!-- Quick Search (desktop) -->
+  <form class="d-none d-md-block" onsubmit="return false">
+    <div class="input-group">
+      <span class="input-group-text"><i class="fa fa-search"></i></span>
+      <input id="searchInputTop" type="text" class="form-control" placeholder="Cari karyawan (nama, NIK, posisi, no. HP, alamat)…">
+    </div>
+  </form>
+  </div>
+</div>
+
+<!-- ===== Add Employee (Collapsible Card) ===== -->
+<div class="card card-elev mb-3">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="fa fa-user-plus me-2"></i>Tambah Karyawan</span>
+    <button class="btn btn-sm btn-light border" type="button" data-bs-toggle="collapse" data-bs-target="#addFormWrap">
+      <i class="fa fa-chevron-down"></i>
+    </button>
+  </div>
+  <div id="addFormWrap" class="collapse show">
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('add_employee') }}">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Nama Karyawan</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fa fa-id-badge"></i></span>
+              <input type="text" name="name" class="form-control" placeholder="Nama lengkap" required>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Posisi / Jabatan</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fa fa-briefcase"></i></span>
+              <input type="text" name="position" class="form-control" placeholder="Contoh: Admin Gudang">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">No. HP</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fa fa-phone"></i></span>
+              <input type="text" name="phone" class="form-control" placeholder="08xxxxxxxxxx">
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Alamat</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fa fa-map-marker"></i></span>
+              <input type="text" name="address" class="form-control" placeholder="Alamat domisili">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Tanggal Masuk</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fa fa-calendar-o"></i></span>
+              <input type="date" name="hire_date" class="form-control">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">No. Rekening</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fa fa-credit-card"></i></span>
+              <input type="text" name="no_rek" class="form-control" placeholder="Nomor rekening bank">
+            </div>
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="fa fa-plus"></i> Tambah
+            </button>
+            <button type="reset" class="btn btn-light border">
+              <i class="fa fa-eraser"></i> Reset
+            </button>
+          </div>
+        </div>
+      </form>
+      <div class="mt-2 search-hint d-md-none">
+        Tip: Gunakan kotak cari di bawah tabel untuk filter cepat.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Inline Search (for small screens) ===== -->
+<div class="row mb-3 align-items-center d-md-none">
+  <div class="col-12">
+    <div class="input-group">
+      <span class="input-group-text"><i class="fa fa-search"></i></span>
+      <input type="text" id="searchInput" class="form-control" placeholder="Cari karyawan…">
+    </div>
+  </div>
+</div>
+
+<!-- ===== Employees Table ===== -->
+<div class="table-wrap">
+  <div class="table-responsive">
+    <table class="table table-hover table-sticky align-middle mb-0" id="employeesTable">
+      <thead class="table-light">
+        <tr>
+          <th class="nowrap">ID</th>
+          <th class="nowrap">NIK</th>
+          <th>Nama</th>
+          <th>Posisi</th>
+          <th class="nowrap">No. HP</th>
+          <th class="nowrap">No. Rek</th>
+          <th>Alamat</th>
+          <th class="nowrap">Tgl Masuk</th>
+          <th class="nowrap">Masa Kerja</th> <!-- BARU -->
+          <th class="nowrap">Status</th>
+          <th class="text-center nowrap">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees_data %}
+        <tr>
+          <td class="nowrap">{{ emp.id }}</td>
+          <td class="nowrap">{{ emp.nik }}</td>
+          <td>{{ emp.name }}</td>
+          <td>{{ emp.position }}</td>
+          <td class="nowrap">{{ emp.phone }}</td>
+          <td class="nowrap">
+            {% if emp.no_rek %}{{ emp.no_rek }}{% else %}
+              <span class="badge badge-empty">-</span>
+            {% endif %}
+          </td>
+          <td>{{ emp.address }}</td>
+          <td class="nowrap">
+            {% if emp.hire_date %}{{ emp.hire_date|strftime('%d/%m/%Y') }}{% else %}-{% endif %}
+          </td>
+          <!-- sel diisi via JS agar tanpa ubah backend -->
+          <td class="nowrap masa-kerja"
+              data-hire="{{ emp.hire_date.isoformat() if emp.hire_date else '' }}"></td>
+          <td class="nowrap">
+            {% if emp.status == 'inactive' %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% else %}
+              <span class="badge bg-success">Active</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <div class="btn-group">
+              <a href="{{ url_for('edit_employee', employee_id=emp.id) }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-edit"></i> Edit
+              </a>
+              <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown"></button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item"
+                     href="{{ url_for('employee_components', employee_id=emp.id) }}">
+                    <i class="fa fa-cubes me-2"></i>Komponen
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item text-danger"
+                     href="{{ url_for('delete_employee', employee_id=emp.id) }}"
+                     onclick="return confirm('Yakin ingin menghapus data karyawan ini?');">
+                    <i class="fa fa-trash me-2"></i>Hapus
+                  </a>
+                </li>
+                <li>
+                  <form action="{{ url_for('set_employee_inactive', employee_id=emp.id) }}"
+                        method="post" onsubmit="return confirm('Arsipkan karyawan ini?');">
+                    <button class="dropdown-item">
+                      <i class="fa fa-archive me-2"></i>Arsipkan
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== Live Search (debounced) ===== -->
+<script>
+(function(){
+  function debounce(fn, delay){
+    let t; return function(){
+      clearTimeout(t);
+      const ctx=this, args=arguments;
+      t=setTimeout(()=>fn.apply(ctx,args), delay);
+    };
+  }
+  function filterRows(query){
+    const q = (query||'').toLowerCase();
+    const rows = document.querySelectorAll("#employeesTable tbody tr");
+    rows.forEach(row=>{
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(q) ? "" : "none";
+    });
+  }
+  const topInput = document.getElementById("searchInputTop");
+  const mobInput = document.getElementById("searchInput");
+  const handler = debounce((e)=>filterRows(e.target.value), 200);
+  if(topInput){ topInput.addEventListener("input", handler); }
+  if(mobInput){ mobInput.addEventListener("input", handler); }
+})();
+</script>
+
+<!-- ===== Hitung & Render Masa Kerja dari hire_date ===== -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  function diffYM(start, end){
+    let y = end.getFullYear() - start.getFullYear();
+    let m = end.getMonth() - start.getMonth();
+    const d = end.getDate() - start.getDate();
+    if (d < 0) m -= 1;
+    if (m < 0) { y -= 1; m += 12; }
+    return {years: y, months: m};
+  }
+
+  const today = new Date();
+  document.querySelectorAll('#employeesTable td.masa-kerja').forEach(td => {
+    const iso = td.getAttribute('data-hire');
+    if (!iso) { td.innerHTML = '<span class="badge badge-empty">-</span>'; return; }
+    const start = new Date(iso);
+    if (isNaN(start)) { td.textContent = '-'; return; }
+
+    const {years, months} = diffYM(start, today);
+    let txt = '';
+    if (years > 0) txt += years + ' thn';
+    if (months > 0) txt += (txt ? ' ' : '') + months + ' bln';
+    td.textContent = txt || '0 bln';
+  });
+});
+</script>
+
+{% endblock %}

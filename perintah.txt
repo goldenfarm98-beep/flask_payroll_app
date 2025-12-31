@@ -1,0 +1,11 @@
+file project
+E:\Aplikasi Python\flask_payroll>
+
+Jika belum ada invironment, kalo sudah ada lewati proses ini
+(Disarankan) Buat virtual environment
+py -m venv .venv
+Ini akan membuat folder baru: .venv di dalam flask_payroll
+
+mengaktifkan virtual environment
+.\.venv\Scripts\activate
+

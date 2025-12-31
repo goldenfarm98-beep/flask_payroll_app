@@ -1,0 +1,475 @@
+{% extends 'base.html' %}
+
+{% block head %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --brand: #0f766e;
+    --brand-2: #f97316;
+    --brand-3: #22c55e;
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --line: #e2e8f0;
+    --shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  }
+
+  body {
+    background:
+      radial-gradient(1200px 500px at 10% -10%, #e0f2fe 0%, transparent 60%),
+      radial-gradient(900px 420px at 90% 0%, #fef3c7 0%, transparent 55%),
+      linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    color: var(--ink);
+  }
+
+  .home-shell {
+    position: relative;
+    padding: 10px 0 50px;
+    font-family: "Manrope", sans-serif;
+  }
+
+  .home-shell::before {
+    content: "";
+    position: absolute;
+    inset: -40px;
+    background:
+      radial-gradient(160px 160px at 12% 18%, rgba(14, 116, 144, 0.12), transparent 60%),
+      radial-gradient(220px 220px at 85% 20%, rgba(249, 115, 22, 0.12), transparent 60%);
+    pointer-events: none;
+  }
+
+  .hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    gap: 24px;
+    padding: 32px;
+    border-radius: 26px;
+    background: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(400px 200px at 0% 0%, rgba(14, 116, 144, 0.08), transparent 65%);
+    pointer-events: none;
+  }
+
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--brand);
+  }
+
+  .hero-title {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: clamp(2rem, 2.3vw + 1.3rem, 3.2rem);
+    margin: 10px 0 12px;
+  }
+
+  .hero-sub {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 480px;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 22px;
+  }
+
+  .hero-actions .btn {
+    border-radius: 999px;
+    font-weight: 600;
+    padding: 10px 20px;
+  }
+
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .stat-item {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 16px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .stat-value {
+    font-weight: 800;
+    font-size: 1.2rem;
+  }
+
+  .stat-label {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .stat-meta {
+    color: var(--brand);
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .hero-panels {
+    display: grid;
+    gap: 16px;
+  }
+
+  .panel-card {
+    border-radius: 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    padding: 18px 20px;
+    box-shadow: 0 16px 35px rgba(15, 23, 42, 0.08);
+  }
+
+  .panel-card.alt {
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+
+  .panel-label {
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .panel-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 6px 0 6px;
+  }
+
+  .panel-sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .panel-meta {
+    font-size: 0.85rem;
+    margin-top: 8px;
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .progress {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+
+  .progress span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #14b8a6, #0ea5e9);
+    border-radius: 999px;
+  }
+
+  .progress.amber span {
+    background: linear-gradient(90deg, #f59e0b, #f97316);
+  }
+
+  .section {
+    margin-top: 34px;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .section-title h2 {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.4rem;
+    margin: 0;
+  }
+
+  .section-title p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .insight-grid,
+  .pipeline-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+
+  .insight-card,
+  .pipeline-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .insight-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    color: #0f172a;
+    background: #e0f2fe;
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+  }
+
+  .insight-card:nth-child(2) .insight-icon {
+    background: #fef3c7;
+  }
+
+  .insight-card:nth-child(3) .insight-icon {
+    background: #dcfce7;
+  }
+
+  .insight-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-bottom: 2px;
+  }
+
+  .insight-label {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .insight-meta {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .pipeline-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pipeline-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+
+  .pipeline-card:nth-child(2) .pipeline-tag {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  .pipeline-card:nth-child(3) .pipeline-tag {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .pipeline-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 12px 0 4px;
+  }
+
+  .pipeline-text {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: fadeUp 0.6s ease forwards;
+  }
+
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+  .delay-4 { animation-delay: 0.4s; }
+
+  @keyframes fadeUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .hero {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="home-shell">
+  <section class="hero reveal">
+    <div>
+      <div class="eyebrow">Payroll Insight</div>
+      <h1 class="hero-title">Beranda payroll yang jelas, ringkas, dan siap ditindak</h1>
+      <p class="hero-sub">
+        Pantau performa penggajian, status pinjaman, dan kebutuhan persetujuan
+        tanpa harus membuka banyak halaman.
+      </p>
+      <div class="hero-actions">
+        {% if session.get('user_id') %}
+          {% if session.get('role') == 'admin' %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-dark">
+              <i class="fa fa-tachometer-alt"></i> Dashboard Admin
+            </a>
+            <a href="{{ url_for('employees') }}" class="btn btn-outline-dark">
+              <i class="fa fa-users"></i> Data Karyawan
+            </a>
+          {% else %}
+            <a href="{{ url_for('employee_dashboard') }}" class="btn btn-dark">
+              <i class="fa fa-user"></i> Dashboard Karyawan
+            </a>
+            <a href="{{ url_for('apply_loan') }}" class="btn btn-outline-dark">
+              <i class="fa fa-hand-holding-usd"></i> Ajukan Pinjaman
+            </a>
+          {% endif %}
+        {% else %}
+          <a href="{{ url_for('login') }}" class="btn btn-dark">
+            <i class="fa fa-sign-in-alt"></i> Login
+          </a>
+          <a href="{{ url_for('register') }}" class="btn btn-outline-dark">
+            <i class="fa fa-user-plus"></i> Register
+          </a>
+        {% endif %}
+      </div>
+
+      <div class="stat-strip">
+        <div class="stat-item">
+          <div class="stat-value">{{ active_employees }}</div>
+          <div class="stat-label">Karyawan aktif</div>
+          <div class="stat-meta">Aktif {{ active_pct }} persen</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{ payroll_total }}</div>
+          <div class="stat-label">Payroll periode terbaru</div>
+          <div class="stat-meta">{{ latest_period_label }}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{ loans_active }}</div>
+          <div class="stat-label">Pinjaman aktif</div>
+          <div class="stat-meta">Pending {{ loans_pending }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-panels">
+      <div class="panel-card reveal delay-1">
+        <div class="panel-label">Periode payroll terbaru</div>
+        <div class="panel-value">{{ latest_period_label }}</div>
+        <div class="panel-sub">Disetujui {{ payroll_approved }} dari {{ payroll_total }}</div>
+        <div class="progress"><span style="width: {{ payroll_approved_pct }}%"></span></div>
+        <div class="panel-meta">Draft {{ payroll_draft }} payroll</div>
+      </div>
+      <div class="panel-card alt reveal delay-2">
+        <div class="panel-label">Outstanding pinjaman</div>
+        <div class="panel-value">{{ loan_outstanding|rupiah }}</div>
+        <div class="panel-sub">Total pinjaman {{ loan_total|rupiah }}</div>
+        <div class="progress amber"><span style="width: {{ loan_paid_pct }}%"></span></div>
+        <div class="panel-meta">Aktif {{ loans_active }} pinjaman, terbayar {{ loan_paid_pct }} persen</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">
+      <h2>Insight utama</h2>
+      <p>Ringkas untuk melihat tren penting dalam satu layar.</p>
+    </div>
+    <div class="insight-grid">
+      <div class="insight-card reveal delay-1">
+        <div class="insight-icon"><i class="fa fa-coins"></i></div>
+        <div class="insight-value">{{ payroll_take_home|rupiah }}</div>
+        <div class="insight-label">Total take home periode terbaru</div>
+        <div class="insight-meta">Periode {{ latest_period_label }}</div>
+      </div>
+      <div class="insight-card reveal delay-2">
+        <div class="insight-icon"><i class="fa fa-filter"></i></div>
+        <div class="insight-value">{{ payroll_deductions|rupiah }}</div>
+        <div class="insight-label">Total potongan gaji dan hutang</div>
+        <div class="insight-meta">Termasuk potongan alpha</div>
+      </div>
+      <div class="insight-card reveal delay-3">
+        <div class="insight-icon"><i class="fa fa-users"></i></div>
+        <div class="insight-value">{{ total_employees }}</div>
+        <div class="insight-label">Total karyawan tercatat</div>
+        <div class="insight-meta">Masuk bulan ini {{ hires_this_month }} orang, nonaktif {{ inactive_employees }}</div>
+      </div>
+      <div class="insight-card reveal delay-4">
+        <div class="insight-icon"><i class="fa fa-credit-card"></i></div>
+        <div class="insight-value">{{ payments_pending }}</div>
+        <div class="insight-label">Pembayaran pinjaman menunggu</div>
+        <div class="insight-meta">Pinjaman selesai {{ loans_completed }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">
+      <h2>Pipeline persetujuan</h2>
+      <p>Fokus pada item yang perlu tindakan cepat.</p>
+    </div>
+    <div class="pipeline-grid">
+      <div class="pipeline-card reveal delay-1">
+        <span class="pipeline-tag"><i class="fa fa-file-invoice-dollar"></i> Payroll</span>
+        <div class="pipeline-value">{{ payroll_draft }}</div>
+        <div class="pipeline-text">Payroll draft menunggu approval admin.</div>
+      </div>
+      <div class="pipeline-card reveal delay-2">
+        <span class="pipeline-tag"><i class="fa fa-hand-holding-usd"></i> Pinjaman</span>
+        <div class="pipeline-value">{{ loans_pending }}</div>
+        <div class="pipeline-text">Pengajuan pinjaman baru belum disetujui.</div>
+      </div>
+      <div class="pipeline-card reveal delay-3">
+        <span class="pipeline-tag"><i class="fa fa-clock-o"></i> Pembayaran</span>
+        <div class="pipeline-value">{{ payments_pending }}</div>
+        <div class="pipeline-text">Angsuran masuk yang menunggu verifikasi.</div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

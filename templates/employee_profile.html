@@ -1,0 +1,38 @@
+{% extends 'base1.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header bg-primary text-white">
+    <h4 class="mb-0">Profil Karyawan</h4>
+  </div>
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-3 text-center">
+        <!-- Jika employee.photo tersedia, tampilkan foto tersebut, jika tidak tampilkan default -->
+        <img src="{{ url_for('static', filename='uploads/' ~ employee.photo) if employee.photo else url_for('static', filename='images/yara.png') }}" alt="Foto Profil" class="img-fluid rounded-circle" style="max-width: 150px;">
+      </div>
+      <div class="col-md-9">
+        <h5 class="card-title">{{ employee.name }}</h5>
+        <p class="card-text">
+          <strong>NIK:</strong> {{ employee.nik }}<br>
+          <strong>Posisi:</strong> {{ employee.position or "-" }}<br>
+          <strong>Alamat:</strong> {{ employee.address or "-" }}<br>
+          <strong>No Telp:</strong> {{ employee.phone or "-" }}<br>
+          <strong>Tanggal Masuk:</strong>
+          {% if employee.hire_date %}
+            {{ employee.hire_date|strftime("%d/%m/%Y") }}
+          {% else %}
+            -
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    <!-- Tombol Update Profile -->
+    <div class="d-flex justify-content-end">
+      <a href="{{ url_for('update_profile') }}" class="btn btn-outline-primary">
+        <i class="fa fa-edit"></i> Update Profile
+      </a>
+    </div>
+    <a href="{{ url_for('employee_dashboard') }}" class="btn btn-secondary mt-3">Kembali ke Dashboard</a>
+  </div>
+</div>
+{% endblock %}

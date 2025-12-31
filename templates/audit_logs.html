@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0"><i class="fa fa-list-alt"></i> Audit Log</h2>
+  <div class="d-flex gap-2 align-items-center">
+    <a class="btn btn-outline-secondary" href="{{ url_for('audit_logs', page=pagination.page if pagination else 1, per_page=per_page) }}">
+      <i class="fa fa-sync"></i> Reload
+    </a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard') }}">Kembali</a>
+  </div>
+</div>
+
+<form class="mb-3" method="get" action="{{ url_for('audit_logs') }}">
+  <div class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label mb-0">Tampilkan</label>
+      <select name="per_page" class="form-select" onchange="this.form.submit()">
+        <option value="50"  {% if per_page==50 %}selected{% endif %}>50</option>
+        <option value="100" {% if per_page==100 %}selected{% endif %}>100</option>
+        <option value="200" {% if per_page==200 %}selected{% endif %}>200</option>
+      </select>
+    </div>
+    <input type="hidden" name="page" value="1">
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-striped table-sm align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>ID</th>
+        <th>Waktu</th>
+        <th>User</th>
+        <th>Aksi</th>
+        <th>Entitas</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.id }}</td>
+        <td>{{ log.created_at }}</td>
+        <td>{{ log.user_id or '-' }}</td>
+        <td>{{ log.action }}</td>
+        <td>{{ log.entity_type }} #{{ log.entity_id }}</td>
+        <td>{{ log.details or '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center">Belum ada log.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagination and pagination.pages > 1 %}
+<nav aria-label="Audit pagination" class="mt-3">
+  <ul class="pagination">
+    <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+      <a class="page-link" href="{{ url_for('audit_logs', page=pagination.prev_num, per_page=per_page) }}">&laquo;</a>
+    </li>
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <li class="page-item {{ 'active' if p==pagination.page }}">
+          <a class="page-link" href="{{ url_for('audit_logs', page=p, per_page=per_page) }}">{{ p }}</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+      <a class="page-link" href="{{ url_for('audit_logs', page=pagination.next_num, per_page=per_page) }}">&raquo;</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Edit User</h3>
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Nama Lengkap</label>
+    <input type="text" name="fullname" class="form-control"
+           value="{{ user.fullname }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Email</label>
+    <input type="email" name="email" class="form-control"
+           value="{{ user.email }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Role</label>
+    <select name="role" class="form-select">
+      <option value="user"  {{ 'user'  == user.role and 'selected' }}>User</option>
+      <option value="admin" {{ 'admin' == user.role and 'selected' }}>Admin</option>
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Ganti Password (opsional)</label>
+    <input type="password" name="password" class="form-control">
+  </div>
+
+  <button class="btn btn-success"><i class="fa fa-save"></i> Simpan</button>
+  <a href="{{ url_for('loans') }}" class="btn btn-secondary">Batal</a>
+</form>
+{% endblock %}

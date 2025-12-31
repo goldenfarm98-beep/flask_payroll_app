@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Edit Data Payroll</h2>
+<hr>
+
+<form method="POST" action="{{ url_for('edit_payroll', payroll_id=payroll.id) }}">
+
+  <!-- Pilih Karyawan -->
+  <div class="mb-3">
+    <label for="employee_id" class="form-label">Karyawan</label>
+    <select name="employee_id" id="employee_id" class="form-select" required>
+      {% for emp in employees %}
+      <option value="{{ emp.id }}" {% if emp.id==payroll.employee_id %} selected {% endif %}>
+        {{ emp.name }} ({{ emp.position }})
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label for="pay_period" class="form-label">Periode Gaji</label>
+    <input type="month" id="pay_period" name="pay_period" class="form-control" value="{{ payroll.pay_period }}">
+  </div>
+
+  <!-- Baris 1 -->
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">Gaji Pokok</label>
+      <input type="text" name="gaji_pokok" class="form-control rupiah" value="{{ payroll.gaji_pokok|rupiah }}">
+
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">BPJS Ketenagakerjaan</label>
+      <input type="text" name="bpjs_ketenagakerjaan" class="form-control rupiah"
+        value="{{ payroll.bpjs_ketenagakerjaan|rupiah }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Alpha (hari)</label>
+      <input type="number" name="alpha" class="form-control" step="1" value="{{ payroll.alpha }}">
+    </div>
+  </div>
+
+  <!-- Baris 2 -->
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">Tunjangan Makan</label>
+      <input type="text" name="tunjangan_makan" class="form-control rupiah"
+        value="{{ payroll.tunjangan_makan|rupiah }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Tunjangan Transport</label>
+      <input type="text" name="tunjangan_transport" class="form-control rupiah"
+        value="{{ payroll.tunjangan_transport|rupiah }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Tunjangan Lainnya</label>
+      <input type="text" name="tunjangan_lainnya" class="form-control rupiah"
+        value="{{ payroll.tunjangan_lainnya|rupiah }}">
+    </div>
+  </div>
+
+  <!-- Baris 3 -->
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">Potongan Gaji</label>
+      <input type="text" name="potongan_gaji" class="form-control rupiah" value="{{ payroll.potongan_gaji|rupiah }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Potongan Hutang</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" class="form-control rupiah" value="{{ payroll.hutang|rupiah }}" readonly> {# atau disabled #}
+      </div>
+      <small class="text-muted">Nilai otomatis dari pinjaman, tidak bisa diubah.</small>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Upah Lembur</label>
+      <input type="text" name="upah_lembur" class="form-control rupiah" value="{{ payroll.upah_lembur|rupiah }}">
+    </div>
+  </div>
+
+  <!-- Tombol -->
+  <button type="submit" class="btn btn-success">
+    <i class="fa fa-save"></i> Update
+  </button>
+  <a href="{{ url_for('payrolls') }}" class="btn btn-secondary">Kembali</a>
+</form>
+
+{% endblock %}

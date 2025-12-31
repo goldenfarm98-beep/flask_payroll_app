@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0"><i class="fa fa-cubes"></i> Master Komponen Payroll</h2>
+  <a href="{{ url_for('employees') }}" class="btn btn-outline-secondary">Kembali</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">Tambah Komponen</div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Kode</label>
+            <input type="text" name="code" class="form-control" placeholder="GJ-POKOK" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nama</label>
+            <input type="text" name="name" class="form-control" placeholder="Gaji Pokok" required>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Tipe</label>
+              <select name="comp_type" class="form-select" required>
+                <option value="gaji_pokok">Gaji Pokok</option>
+                <option value="tunjangan">Tunjangan</option>
+                <option value="potongan">Potongan</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Perhitungan</label>
+              <select name="calc_type" class="form-select">
+                <option value="fixed">Fixed</option>
+                <option value="percentage">Percent of Gaji Pokok</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Nilai Default</label>
+              <input type="number" step="0.01" name="default_value" class="form-control" value="0">
+            </div>
+          </div>
+          <button class="btn btn-primary mt-3" type="submit"><i class="fa fa-plus"></i> Tambah</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Daftar Komponen</div>
+  <div class="card-body p-0">
+    <div class="table-responsive mb-0">
+      <table class="table table-striped align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Kode</th>
+            <th>Nama</th>
+            <th>Tipe</th>
+            <th>Perhitungan</th>
+            <th>Default</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in components %}
+          <tr>
+            <td>{{ c.code }}</td>
+            <td>{{ c.name }}</td>
+            <td>{{ c.comp_type }}</td>
+            <td>{{ c.calc_type }}</td>
+            <td>{{ c.default_value }}</td>
+            <td>
+              {% if c.active %}
+                <span class="badge bg-success">Aktif</span>
+              {% else %}
+                <span class="badge bg-secondary">Nonaktif</span>
+              {% endif %}
+            </td>
+            <td>
+              <form action="{{ url_for('toggle_component', comp_id=c.id) }}" method="post">
+                <button class="btn btn-sm btn-outline-primary">
+                  {% if c.active %}Nonaktifkan{% else %}Aktifkan{% endif %}
+                </button>
+              </form>
+              <a href="{{ url_for('edit_component', comp_id=c.id) }}" class="btn btn-sm btn-outline-secondary mt-1">
+                <i class="fa fa-edit"></i> Edit
+              </a>
+              <form action="{{ url_for('delete_component', comp_id=c.id) }}" method="post" class="mt-1"
+                    onsubmit="return confirm('Hapus komponen ini? Komponen yang sudah dipakai tidak bisa dihapus.');">
+                <button class="btn btn-sm btn-outline-danger">
+                  <i class="fa fa-trash"></i> Hapus
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center">Belum ada komponen.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

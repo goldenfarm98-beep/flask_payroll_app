@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0"><i class="fa fa-edit"></i> Edit Komponen</h3>
+  <a href="{{ url_for('components') }}" class="btn btn-outline-secondary">
+    <i class="fa fa-arrow-left"></i> Kembali
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Kode</label>
+          <input type="text" name="code" class="form-control" value="{{ comp.code }}" required>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Nama</label>
+          <input type="text" name="name" class="form-control" value="{{ comp.name }}" required>
+        </div>
+      </div>
+      <div class="row g-3 mt-3">
+        <div class="col-md-4">
+          <label class="form-label">Tipe</label>
+          <select name="comp_type" class="form-select" required>
+            <option value="gaji_pokok" {% if comp.comp_type=='gaji_pokok' %}selected{% endif %}>Gaji Pokok</option>
+            <option value="tunjangan" {% if comp.comp_type=='tunjangan' %}selected{% endif %}>Tunjangan</option>
+            <option value="potongan" {% if comp.comp_type=='potongan' %}selected{% endif %}>Potongan</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Perhitungan</label>
+          <select name="calc_type" class="form-select">
+            <option value="fixed" {% if comp.calc_type=='fixed' %}selected{% endif %}>Fixed</option>
+            <option value="percentage" {% if comp.calc_type=='percentage' %}selected{% endif %}>Percent of Gaji Pokok</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Nilai Default</label>
+          <input type="number" step="0.01" name="default_value" class="form-control" value="{{ comp.default_value or 0 }}">
+        </div>
+      </div>
+      <button class="btn btn-primary mt-3" type="submit">
+        <i class="fa fa-save"></i> Simpan Perubahan
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

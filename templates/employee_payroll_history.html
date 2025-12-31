@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">
+    <i class="fa fa-file-invoice-dollar"></i>
+    Payroll History: {{ employee.name }} ({{ employee.nik }})
+  </h3>
+  <a class="btn btn-outline-secondary" href="{{ url_for('employees_archive') }}">
+    <i class="fa fa-arrow-left"></i> Kembali
+  </a>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>ID</th>
+        <th>Periode</th>
+        <th>Status</th>
+        <th>Gaji Pokok</th>
+        <th>Potongan</th>
+        <th>Take Home Pay</th>
+        <th>Slip</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in payrolls %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td>{{ p.pay_period }}</td>
+        <td>
+          {% if p.status == 'approved' %}
+            <span class="badge bg-success">Approved</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">{{ p.status or 'draft' }}</span>
+          {% endif %}
+        </td>
+        <td>Rp. {{ p.gaji_pokok|rupiah }}</td>
+        <td>Rp. {{ p.total_deductions|rupiah }}</td>
+        <td><strong>Rp. {{ p.take_home_pay|rupiah }}</strong></td>
+        <td>
+          <a class="btn btn-sm btn-outline-info" href="{{ url_for('payslip', payroll_id=p.id) }}">
+            <i class="fa fa-file-alt"></i> Slip
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="text-center">Belum ada payroll untuk karyawan ini.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

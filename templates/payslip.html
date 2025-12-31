@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  /* Hide elemen dengan class no-print saat media cetak */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+
+    /* Opsional: atur margin dan ukuran kertas */
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  }
+</style>
+
+<!-- Header Slip -->
+<div class="row mb-3">
+  <div class="col-md-6 d-flex align-items-center">
+    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Company Logo"
+      style="max-height:80px; margin-right:10px;">
+    <div>
+      <h4 class="mb-0">CV. Golden Farm 99</h4>
+      <small>Jl. Mawar putih blok A18/8N, Jakarta</small>
+    </div>
+  </div>
+  <div class="col-md-6 text-end align-self-center">
+    <h3 class="mb-0">Slip Gaji</h3>
+  </div>
+</div>
+<hr>
+
+<!-- Tombol Kembali -->
+<div class="mb-3">
+  <a href="{{ url_for('payrolls') }}" class="btn btn-secondary">
+    <i class="fa fa-chevron-left"></i> Kembali
+  </a>
+</div>
+
+<!-- Data Karyawan & Periode -->
+<div class="row">
+  <div class="col-md-6">
+    <p><strong>Karyawan :</strong> {{ payroll.employee.name }} ({{ payroll.employee.nik }})</p>
+    <p><strong>Jabatan :</strong> {{ payroll.employee.position or '-' }}</p>
+    <p><strong>Periode :</strong> {{ payroll.pay_period or '-' }}</p>
+  </div>
+  <div class="col-md-6 text-end">
+    <p><strong>Tanggal Masuk :</strong>
+      {% if payroll.employee.hire_date %}
+      {{ payroll.employee.hire_date|strftime('%d/%m/%Y') }}
+      {% else %}
+      -
+      {% endif %}
+    </p>
+    <p><strong>ID Payroll :</strong> {{ payroll.id }}</p>
+  </div>
+</div>
+
+<!-- Rincian Pendapatan -->
+<div class="mt-4 mb-3">
+  <h5>Rincian Pendapatan</h5>
+  <table class="table table-bordered">
+    <tbody>
+      <tr>
+        <td>Gaji Pokok</td>
+        <td class="text-end">Rp. {{ payroll.gaji_pokok|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>BPJS Ketenagakerjaan</td>
+        <td class="text-end">Rp. {{ payroll.bpjs_ketenagakerjaan|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>Tunjangan Makan</td>
+        <td class="text-end">Rp. {{ payroll.tunjangan_makan|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>Tunjangan Transport</td>
+        <td class="text-end">Rp. {{ payroll.tunjangan_transport|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>Tunjangan Lainnya</td>
+        <td class="text-end">Rp. {{ payroll.tunjangan_lainnya|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>THR <br><small class="text-muted">diberikan 1 tahun sekali</small></td>
+        <td class="text-end">Rp. {{ payroll.thr|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>Upah Lembur</td>
+        <td class="text-end">Rp. {{ payroll.upah_lembur|rupiah }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Rincian Potongan -->
+<div class="mb-3">
+  <h5>Rincian Potongan</h5>
+  <table class="table table-bordered">
+    <tbody>
+      {#–– Alpha ––#}
+      {% set pot_alpha = payroll.alpha * (payroll.gaji_pokok / 30) %}
+      <tr>
+        <td>Alpha ({{ payroll.alpha }} hari)</td>
+        <td class="text-end">Rp. {{ pot_alpha|rupiah }}</td>
+      </tr>
+
+      {#–– Potongan Gaji Lain ––#}
+      <tr>
+        <td>Potongan Gaji Lain</td>
+        <td class="text-end">Rp. {{ payroll.potongan_gaji|rupiah }}</td>
+      </tr>
+
+      {# Pinjaman #}
+      {% if payroll.installments %}
+      {% for pl in payroll.installments %}
+      <tr>
+        <td>Pinjaman #{{ pl.loan_id }} Cicilan {{ pl.installment_number }}/{{ pl.loan.tenor }}</td>
+        <td class="text-end">Rp. {{ pl.amount|rupiah }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="table-active">
+        <td><strong>Potongan Hutang ( Berasal dari Pinjaman Karyawan )</strong></td>
+        <td class="text-end"><strong>Rp. {{ payroll.hutang|rupiah }}</strong></td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="2" class="text-center">Tidak ada potongan pinjaman</td>
+      </tr>
+      {% endif %}
+
+      {# Total semua potongan #}
+      <tr class="table-primary">
+        <td><strong>Total Potongan</strong></td>
+        <td class="text-end"><strong>Rp. {{ payroll.total_deductions|rupiah }}</strong></td>
+      </tr>
+    </tbody>
+
+  </table>
+</div>
+
+<!-- Take Home Pay -->
+<div class="border p-3 bg-light">
+  <h5 class="text-end">
+    Take Home Pay:
+    <strong class="text-success">Rp. {{ payroll.take_home_pay|rupiah }}</strong>
+  </h5>
+</div>
+<!-- Tombol Print -->
+<button class="btn btn-primary mt-3 no-print" onclick="window.print()">
+  <i class="fa fa-print"></i> Print
+</button>
+
+{% endblock %}

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Payroll App</title>
+  <!-- Bootstrap CSS -->
+  <link 
+    rel="stylesheet" 
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <!-- Font Awesome -->
+  <link 
+    rel="stylesheet" 
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light no-print">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{{ url_for('index') }}">
+        <i class="fa fa-coins"></i> Payroll App
+      </a>
+      <button 
+          class="navbar-toggler" 
+          type="button" 
+          data-bs-toggle="collapse" 
+          data-bs-target="#navbarNav" 
+          aria-controls="navbarNav" 
+          aria-expanded="false" 
+          aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          {% if session.get('user_id') %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('dashboard') }}">
+                <i class="fa fa-tachometer-alt"></i> Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('employees') }}">
+                <i class="fa fa-users"></i> Data Karyawan
+              </a>
+            </li>
+            {% if session.get('role') == 'admin' %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('employees_archive') }}">
+                <i class="fa fa-archive"></i> Arsip Karyawan
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('components') }}">
+                <i class="fa fa-cubes"></i> Master Komponen
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('audit_logs') }}">
+                <i class="fa fa-list-alt"></i> Audit Log
+              </a>
+            </li>
+            {% endif %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('logout') }}">
+                <i class="fa fa-sign-out-alt"></i> Logout
+              </a>
+            </li>
+          {% else %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('login') }}">
+                <i class="fa fa-sign-in-alt"></i> Login
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('register') }}">
+                <i class="fa fa-user-plus"></i> Register
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <!-- Tempat pesan flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    
+    <!-- Content -->
+    {% block content %}
+    {% endblock %}
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script 
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
+  </script>
+  <!-- Custom JS -->
+  <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+  <script>
+    // Sisipkan CSRF ke semua form POST
+    document.addEventListener('DOMContentLoaded', () => {
+      const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      if (!token) return;
+      document.querySelectorAll('form').forEach(f => {
+        if ((f.method || '').toLowerCase() === 'post') {
+          if (!f.querySelector('input[name="csrf_token"]')) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'csrf_token';
+            hidden.value = token;
+            f.appendChild(hidden);
+          }
+        }
+      });
+    });
+  </script>
+  <script>
+    // Fungsi memformat angka menjadi format "x.xxx.xxx"
+    function formatRupiah(angka) {
+      // Hanya ambil digit (0-9)
+      let number_string = angka.replace(/[^,\d]/g, "").toString(),
+          split = number_string.split(","),
+          sisa  = split[0].length % 3,
+          rupiah  = split[0].substr(0, sisa),
+          ribuan  = split[0].substr(sisa).match(/\d{3}/gi);
+      
+      // Tambahkan titik jika yang di input sudah menjadi ribuan
+      if (ribuan) {
+        let separator = sisa ? "." : "";
+        rupiah += separator + ribuan.join(".");
+      }
+      
+      // Jika ada angka di belakang koma
+      rupiah = split[1] != undefined 
+               ? rupiah + "," + split[1] 
+               : rupiah;
+      
+      return rupiah;
+    }
+  
+    // Event Listener untuk semua elemen input dengan class .rupiah
+    document.addEventListener("DOMContentLoaded", function(){
+      const rupiahInputs = document.querySelectorAll(".rupiah");
+      rupiahInputs.forEach(function(input){
+        // Ketika user mengetik
+        input.addEventListener("keyup", function(e){
+          this.value = formatRupiah(this.value);
+        });
+      });
+    });
+  </script>
+  
+</body>
+</html>

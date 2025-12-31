@@ -1,0 +1,216 @@
+{% extends 'base1.html' %}
+{% block content %}
+<h2>Dashboard Karyawan - {{ employee.name }}</h2>
+<hr>
+<div class="mb-3">
+  <a href="{{ url_for('apply_loan') }}" class="btn btn-primary">
+    <i class="fa fa-hand-holding-usd"></i> Ajukan Pinjaman
+  </a>
+</div>
+
+<h4>Riwayat Pengajuan Pinjaman</h4>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Jumlah Pinjaman</th>
+      <th>Total Pinjaman</th>
+      <th>Sisa Pinjaman</th>
+      <th>Tenor (bulan)</th>
+      <th>Cicilan</th>
+      <th>Angsuran Ke</th>
+      <th>Status</th>
+      <th>Tanggal Pengajuan</th>
+      <th>Aksi</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for loan in loans %}
+    {% set total = loan.amount + (loan.amount * loan.interest_rate / 100) %}
+    {% set paid = loan.payments|sum(attribute='payment_amount') %}
+    {% set remaining = total - paid %}
+    <tr>
+      <td>{{ loan.id }}</td>
+      <td>{{ loan.amount|rupiah }}</td>
+      <td>{{ total|rupiah }}</td>
+      <td><span class="badge bg-warning text-dark">{{ remaining|rupiah }}</span></td>
+      <td>{{ loan.tenor }}</td>
+      <td>
+  {# inisialisasi penampung #}
+  {% set ns = namespace(idx=1, total=0) %}
+
+  {# loop setiap Payment yang sudah disetujui / diposting #}
+  {% for pay in loan.payments if pay.status in ('approved', 'posted') %}
+    {% set ns.total = ns.total + pay.payment_amount %}
+    Cicilan {{ ns.idx }} = {{ pay.payment_amount|rupiah }}<br>
+    {% set ns.idx = ns.idx + 1 %}
+  {% endfor %}
+
+  {# jika belum ada pembayaran, tampilkan strip – #}
+  {% if ns.idx == 1 %}
+    –
+  {% else %}
+    <hr class="my-1">
+    <strong>Total&nbsp;=&nbsp;{{ ns.total|rupiah }}</strong>
+  {% endif %}
+</td>
+
+      <td>
+        {% if loan.status != 'completed' %}
+          {{ loan.payments|length + 1 }}
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td>
+        {% if loan.status == 'completed' %}
+          <span class="badge bg-success text-white">
+            <i class="fa fa-check"></i> Completed
+          </span>
+        {% elif loan.status == 'approved' %}
+          <span class="badge bg-info text-white">
+            <i class="fa fa-thumbs-up"></i> Approved
+          </span>
+        {% elif loan.status == 'pending' %}
+          <span class="badge bg-warning text-dark">
+            <i class="fa fa-clock-o"></i> Pending
+          </span>
+        {% elif loan.status == 'rejected' %}
+          <span class="badge bg-danger text-white">
+            <i class="fa fa-times"></i> Rejected
+          </span>
+        {% else %}
+          <span class="badge bg-secondary">{{ loan.status }}</span>
+        {% endif %}
+      </td>
+      <td>{{ loan.application_date|strftime('%d/%m/%Y') }}</td>
+      <td>
+        {% if loan.status == 'completed' %}
+          <!-- Tombol Show hanya muncul saat status pinjaman completed -->
+          <a href="{{ url_for('loan_payments', loan_id=loan.id) }}" class="btn btn-info btn-sm">
+            <i class="fa fa-eye"></i> Show
+          </a>
+        {% elif loan.status == 'approved' %}
+          {% if remaining > 0 %}
+            <form action="{{ url_for('pay_loan', loan_id=loan.id) }}" method="POST" class="d-inline">
+              <input type="text" name="payment_amount" value="{{ loan.installment|rupiah }}" class="form-control form-control-sm d-inline" style="width: 100px;" required>
+              <button type="submit" class="btn btn-sm btn-primary">
+                <i class="fa fa-credit-card"></i> Bayar
+              </button>
+            </form>
+          {% else %}
+            <span class="badge bg-success text-white">
+              <i class="fa fa-check-circle"></i> Lunas
+            </span>
+          {% endif %}
+        {% endif %}
+      </td>
+      
+      
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="10" class="text-center">Belum ada pengajuan pinjaman.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Histori Pembayaran Angsuran Aktif -->
+<h4>Histori Pembayaran Angsuran Aktif</h4>
+{% if active_payments and active_payments|length > 0 %}
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>ID Pembayaran</th>
+        <th>Jumlah Bayar</th>
+        <th>Tanggal Bayar</th>
+        <th>ID Pinjaman</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for payment in active_payments %}
+      <tr>
+        <td>{{ payment.id }}</td>
+        <td>{{ payment.payment_amount|rupiah }}</td>
+        <td>{{ payment.payment_date|strftime('%d/%m/%Y') }}</td>
+        <td>{{ payment.loan_id }}</td>
+        <td>
+          {% if payment.status == 'pending' %}
+            <span class="text-warning">
+              <i class="fa fa-clock-o"></i> Pending
+            </span>
+          {% elif payment.status == 'approved' %}
+            <span class="text-success">
+              <i class="fa fa-check-circle"></i> Approved
+            </span>
+          {% elif payment.status == 'rejected' %}
+            <span class="text-danger">
+              <i class="fa fa-times"></i> Rejected
+            </span>
+          {% else %}
+            <span class="text-secondary">-</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>Tidak ada histori pembayaran angsuran aktif.</p>
+{% endif %}
+
+
+<hr>
+<!-- Histori Pembayaran Angsuran Arsip dengan pagination -->
+<h4>Histori Pembayaran Angsuran Arsip</h4>
+{% if archived_payments and archived_payments|length > 0 %}
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>ID Pembayaran</th>
+        <th>Jumlah Bayar</th>
+        <th>Tanggal Bayar</th>
+        <th>ID Pinjaman</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for payment in archived_payments %}
+      <tr>
+        <td>{{ payment.id }}</td>
+        <td>{{ payment.payment_amount|rupiah }}</td>
+        <td>{{ payment.payment_date|strftime('%d/%m/%Y') }}</td>
+        <td>{{ payment.loan_id }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Tautan Pagination -->
+  <nav aria-label="Arsip Payment pages">
+    <ul class="pagination">
+      <!-- Tombol Previous -->
+      <li class="page-item {% if not archived_pagination.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('employee_dashboard', page=archived_pagination.prev_num) }}" aria-label="Previous">
+          &laquo;
+        </a>
+      </li>
+      <!-- Nomor Halaman -->
+      {% for page_num in range(1, archived_pagination.pages + 1) %}
+      <li class="page-item {% if page_num == archived_pagination.page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('employee_dashboard', page=page_num) }}">{{ page_num }}</a>
+      </li>
+      {% endfor %}
+      <!-- Tombol Next -->
+      <li class="page-item {% if not archived_pagination.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('employee_dashboard', page=archived_pagination.next_num) }}" aria-label="Next">
+          &raquo;
+        </a>
+      </li>
+    </ul>
+  </nav>
+{% else %}
+  <p>Tidak ada histori pembayaran angsuran arsip.</p>
+{% endif %}
+{% endblock %}

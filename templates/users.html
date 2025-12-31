@@ -1,0 +1,42 @@
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Nama</th>
+      <th>Username</th>
+      <th>Role</th>
+      <th class="text-center">Aksi</th>   {# ← kolom aksi #}
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ u.full_name }}</td>
+      <td>{{ u.username }}</td>
+      <td>{{ u.role }}</td>
+
+      <!-- ===== kolom aksi: edit + hapus ===== -->
+      <td class="text-center">
+
+        {# Tombol Edit (jika ada) #}
+        <a href="{{ url_for('edit_user', user_id=u.id) }}"
+           class="btn btn-sm btn-info me-1">
+          <i class="fa fa-pencil-alt"></i>
+        </a>
+
+        {# Tombol Hapus — inilah form yang Anda tanyakan #}
+        <form action="{{ url_for('delete_user', user_id=u.id) }}"
+              method="post"
+              class="d-inline"
+              onsubmit="return confirm('Hapus user ini?');">
+          <button class="btn btn-sm btn-danger">
+            <i class="fa fa-trash"></i>
+          </button>
+        </form>
+
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

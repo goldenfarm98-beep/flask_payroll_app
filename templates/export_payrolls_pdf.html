@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Data Payroll</title>
+    <style>
+       table { width: 100%; border-collapse: collapse; }
+       th, td { border: 1px solid #000; padding: 5px; text-align: left; }
+    </style>
+</head>
+<body>
+    <h2>Data Payroll</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Karyawan</th>
+                <th>Periode</th>
+                <th>Gaji Pokok</th>
+                <th>BPJS Ketenagakerjaan</th>
+                <th>Tunjangan Makan</th>
+                <th>Tunjangan Transport</th>
+                <th>Tunjangan Lainnya</th>
+                <th>THR</th>
+                <th>Potongan Gaji</th>
+                <th>Alpha</th>
+                <th>Hutang</th>
+                <th>Upah Lembur</th>
+                <th>Take Home Pay</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in payrolls %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>{{ p.employee.name }}</td>
+                <td>{{ p.pay_period }}</td>
+                <td>{{ p.gaji_pokok|rupiah }}</td>
+                <td>{{ p.bpjs_ketenagakerjaan|rupiah }}</td>
+                <td>{{ p.tunjangan_makan|rupiah }}</td>
+                <td>{{ p.tunjangan_transport|rupiah }}</td>
+                <td>{{ p.tunjangan_lainnya|rupiah }}</td>
+                <td>{{ p.thr|rupiah }}</td>
+                <td>{{ p.potongan_gaji|rupiah }}</td>
+                <td>{{ p.alpha }}</td>
+                <td>{{ p.hutang|rupiah }}</td>
+                <td>{{ p.upah_lembur|rupiah }}</td>
+                <td>{{ p.take_home_pay|rupiah }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

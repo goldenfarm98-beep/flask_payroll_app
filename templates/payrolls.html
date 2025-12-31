@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+  /* ====== Payrolls Desktop Polish ====== */
+  .page-header {
+    display:flex; align-items:center; justify-content:space-between;
+    gap:1rem; margin-bottom:1rem;
+  }
+  .page-title {
+    display:flex; align-items:center; gap:.6rem; margin:0;
+    font-weight:700;
+  }
+  .page-title .badge-period {
+    font-size:.8rem; font-weight:600;
+  }
+  .toolbar .btn { white-space:nowrap; }
+
+  .card-filter { border:0; box-shadow:0 6px 20px rgba(0,0,0,.06); }
+  .card-filter .card-header {
+    background:linear-gradient(135deg,#0d6efd 0%, #39a7ff 100%);
+    color:#fff; font-weight:600;
+  }
+
+  .table-wrap { border-radius:14px; overflow:hidden; box-shadow:0 10px 24px rgba(0,0,0,.06); }
+  .table-sticky thead th {
+    position:sticky; top:0; z-index:2; background:#f8fafc;
+  }
+  .table-sticky tbody tr:hover { background:#f6fbff; }
+  .table td, .table th { vertical-align:middle; }
+  .text-money { text-align:right; font-variant-numeric:tabular-nums; }
+  .thp { font-weight:800; }
+  .nowrap { white-space:nowrap; }
+
+  /* Compact pagination */
+  .pagination .page-link { border-radius:8px; }
+</style>
+
+<div class="page-header">
+  <h2 class="page-title">
+    <i class="fa fa-file-invoice-dollar text-primary"></i>
+    Data Payroll
+  </h2>
+
+  <div class="d-flex align-items-center gap-2">
+    {% if draft_count is defined %}
+      <span class="badge bg-warning text-dark">
+        Belum disetujui: {{ draft_count }}
+      </span>
+    {% endif %}
+  </div>
+
+  <div class="toolbar d-flex align-items-center gap-2">
+    <form method="post" action="{{ url_for('bulk_approve_payrolls') }}" id="bulk-approve-form" class="d-flex gap-2">
+      <button type="submit" class="btn btn-success" onclick="return confirm('Setujui semua payroll yang dipilih?');">
+        <i class="fa fa-check"></i> Setujui Terpilih
+      </button>
+    </form>
+
+    <a href="{{ url_for('add_payroll') }}" class="btn btn-primary">
+      <i class="fa fa-plus"></i> Tambah Payroll
+    </a>
+
+    {# Export dropdown agar rapi #}
+    {% set kw = request.args.get('keyword', '') %}
+    {% set per = request.args.get('pay_period', '') %}
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="fa fa-file-export"></i> Export
+      </button>
+      <div class="dropdown-menu dropdown-menu-end">
+        <a class="dropdown-item"
+           href="{{ url_for('export_payrolls', file_format='excel', keyword=kw, pay_period=per) }}">
+          <i class="fa fa-file-excel-o me-2"></i>Excel
+        </a>
+        <a class="dropdown-item"
+           href="{{ url_for('export_payrolls', file_format='pdf', keyword=kw, pay_period=per) }}">
+          <i class="fa fa-file-pdf-o me-2"></i>PDF
+        </a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item"
+           href="{{ url_for('compliance_report', pay_period=per or request.args.get('pay_period','')) }}">
+          <i class="fa fa-shield me-2"></i>CSV Laporan Kepatuhan
+        </a>
+        <a class="dropdown-item"
+           href="{{ url_for('bank_export', pay_period=per or request.args.get('pay_period','')) }}">
+          <i class="fa fa-university me-2"></i>CSV Ekspor Bank
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Filter Card ===== -->
+<div class="card card-filter mb-3">
+  <div class="card-header"><i class="fa fa-filter me-2"></i>Filter & Tampilan</div>
+  <div class="card-body">
+    <form method="GET" action="{{ url_for('payrolls') }}">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label">Cari nama</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="fa fa-search"></i></span>
+            <input type="text" name="keyword" class="form-control" placeholder="Ketik nama karyawan…"
+                   value="{{ request.args.get('keyword','') }}">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Periode gaji</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="fa fa-calendar-o"></i></span>
+            <input type="month" name="pay_period" class="form-control"
+                   value="{{ request.args.get('pay_period','') }}">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Tampilkan per halaman</label>
+          <select name="per_page" class="form-select" onchange="this.form.submit()">
+            <option value="10"  {% if per_page==10 %}selected{% endif %}>10</option>
+            <option value="50"  {% if per_page==50 %}selected{% endif %}>50</option>
+            <option value="100" {% if per_page==100 %}selected{% endif %}>100</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-grid d-md-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="fa fa-search"></i> Cari
+          </button>
+          <a href="{{ url_for('payrolls') }}" class="btn btn-light border">
+            <i class="fa fa-undo"></i> Reset
+          </a>
+        </div>
+      </div>
+
+      {# Chips filter aktif #}
+      {% if request.args.get('keyword') or request.args.get('pay_period') %}
+      <div class="mt-3 small text-muted">
+        Filter aktif:
+        {% if request.args.get('keyword') %}
+          <span class="badge bg-secondary me-1">
+            <i class="fa fa-user-o"></i> "{{ request.args.get('keyword') }}"
+          </span>
+        {% endif %}
+        {% if request.args.get('pay_period') %}
+          <span class="badge bg-info text-dark">
+            <i class="fa fa-calendar-o"></i> {{ request.args.get('pay_period') }}
+          </span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- ===== Table Card ===== -->
+<div class="table-wrap">
+  <div class="table-responsive">
+    <table class="table table-hover table-sticky align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="text-center" style="width:36px;">
+            <input type="checkbox" id="check-all">
+          </th>
+          <th class="nowrap">ID</th>
+          <th>Nama Karyawan</th>
+          <th class="nowrap">Periode</th>
+          <th class="nowrap text-center">Status</th>
+          <th class="text-money">Gaji Pokok</th>
+          <th class="text-money">BPJS Ketenagakerjaan</th>
+          <th class="text-money">Tunj. Makan</th>
+          <th class="text-money">Tunj. Transport</th>
+          <th class="text-money">Tunj. Lainnya</th>
+          <th class="text-money">THR</th>
+          <th class="text-center">Alpha</th>
+          <th class="text-money">Upah Lembur</th>
+          <th class="text-money">Pot. Gaji</th>
+          <th class="text-money">Pot. Hutang</th>
+          <th class="text-money">Total Potongan</th>
+          <th class="text-money">Take Home Pay</th>
+          <th class="text-center">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for payroll in payrolls %}
+        <tr>
+          <td class="text-center">
+            {% if payroll.status != 'approved' %}
+              <input type="checkbox" name="payroll_ids" form="bulk-approve-form" value="{{ payroll.id }}" class="row-check">
+            {% endif %}
+          </td>
+          <td class="nowrap">{{ payroll.id }}</td>
+          <td>{{ payroll.employee.name }}</td>
+          <td class="nowrap">{{ payroll.pay_period }}</td>
+          <td class="text-center">
+            {% if payroll.status == 'approved' %}
+              <span class="badge bg-success">Approved</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Draft</span>
+            {% endif %}
+          </td>
+
+          <td class="text-money">Rp. {{ payroll.gaji_pokok|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.bpjs_ketenagakerjaan|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.tunjangan_makan|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.tunjangan_transport|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.tunjangan_lainnya|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.thr|rupiah }}</td>
+
+          <td class="text-center">
+            {% if payroll.alpha and payroll.alpha > 0 %}
+              <span class="badge bg-warning text-dark">{{ payroll.alpha }}</span>
+            {% else %} – {% endif %}
+          </td>
+
+          <td class="text-money">Rp. {{ payroll.upah_lembur|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.potongan_gaji|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.hutang|rupiah }}</td>
+          <td class="text-money">Rp. {{ (payroll.potongan_gaji + payroll.hutang)|rupiah }}</td>
+
+          <td class="text-money thp text-success">Rp. {{ payroll.take_home_pay|rupiah }}</td>
+
+          <td class="text-center">
+            <div class="btn-group">
+              <a href="{{ url_for('payslip', payroll_id=payroll.id) }}" class="btn btn-outline-info btn-sm">
+                <i class="fa fa-file-invoice-dollar"></i> Slip
+              </a>
+              <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown"></button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  {% if payroll.status != 'approved' %}
+                    <a class="dropdown-item" href="{{ url_for('edit_payroll', payroll_id=payroll.id) }}">
+                      <i class="fa fa-edit me-2"></i>Edit
+                    </a>
+                  {% else %}
+                    <span class="dropdown-item text-muted"><i class="fa fa-lock me-2"></i>Terkunci</span>
+                  {% endif %}
+                </li>
+                {% if payroll.status != 'approved' %}
+                <li>
+                  <form action="{{ url_for('approve_payroll', payroll_id=payroll.id) }}"
+                        method="post"
+                        onsubmit="return confirm('Setujui dan kunci payroll ini?');">
+                    <button class="dropdown-item text-success">
+                      <i class="fa fa-check me-2"></i>Setujui
+                    </button>
+                  </form>
+                </li>
+                {% endif %}
+                <li>
+                  {% if payroll.status != 'approved' %}
+                    <a class="dropdown-item text-danger"
+                       href="{{ url_for('delete_payroll', payroll_id=payroll.id) }}"
+                       onclick="return confirm('Yakin ingin menghapus data payroll ini?')">
+                      <i class="fa fa-trash me-2"></i>Hapus
+                    </a>
+                  {% else %}
+                    <span class="dropdown-item text-muted"><i class="fa fa-ban me-2"></i>Hapus dinonaktifkan</span>
+                  {% endif %}
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const checkAll = document.getElementById('check-all');
+    const rowChecks = document.querySelectorAll('.row-check');
+    if (checkAll) {
+      checkAll.addEventListener('change', () => {
+        rowChecks.forEach(cb => cb.checked = checkAll.checked);
+      });
+    }
+  });
+</script>
+
+<!-- ===== Pagination ===== -->
+{% if pagination.pages > 1 %}
+  <div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="small text-muted">
+      Halaman <strong>{{ pagination.page }}</strong> dari <strong>{{ pagination.pages }}</strong>
+    </div>
+    <nav aria-label="Page navigation">
+      <ul class="pagination mb-0">
+        <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+          <a class="page-link"
+             href="{{ url_for('payrolls',
+                               page=pagination.prev_num,
+                               per_page=per_page,
+                               keyword=request.args.get('keyword',''),
+                               pay_period=request.args.get('pay_period','')) }}">&laquo;</a>
+        </li>
+
+        {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if p %}
+            <li class="page-item {{ 'active' if p==pagination.page }}">
+              <a class="page-link"
+                 href="{{ url_for('payrolls',
+                                   page=p, per_page=per_page,
+                                   keyword=request.args.get('keyword',''),
+                                   pay_period=request.args.get('pay_period','')) }}">{{ p }}</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+
+        <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+          <a class="page-link"
+             href="{{ url_for('payrolls',
+                               page=pagination.next_num,
+                               per_page=per_page,
+                               keyword=request.args.get('keyword',''),
+                               pay_period=request.args.get('pay_period','')) }}">&raquo;</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+{% endif %}
+
+{% endblock %}

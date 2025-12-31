@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+  .table-wrap{ border-radius:14px; overflow:hidden; box-shadow:0 10px 24px rgba(0,0,0,.06); }
+  .table-sticky thead th{ position:sticky; top:0; z-index:2; background:#f8fafc; }
+  .table td,.table th{ vertical-align:middle; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">
+    <i class="fa fa-archive text-secondary"></i> Arsip Karyawan
+  </h2>
+  <a href="{{ url_for('employees') }}" class="btn btn-outline-primary">
+    <i class="fa fa-users"></i> Lihat Karyawan Aktif
+  </a>
+</div>
+
+<div class="table-wrap">
+  <div class="table-responsive">
+    <table class="table table-hover table-sticky align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="nowrap">ID</th>
+          <th class="nowrap">NIK</th>
+          <th>Nama</th>
+          <th>Posisi</th>
+          <th class="nowrap">No. HP</th>
+          <th class="nowrap">No. Rek</th>
+          <th>Alamat</th>
+          <th class="nowrap">Tgl Masuk</th>
+          <th>Payroll Pernah Diterima</th>
+          <th class="nowrap">Status</th>
+          <th class="text-center nowrap">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in employees_data %}
+        <tr>
+          <td class="nowrap">{{ emp.id }}</td>
+          <td class="nowrap">{{ emp.nik }}</td>
+          <td>{{ emp.name }}</td>
+          <td>{{ emp.position }}</td>
+          <td class="nowrap">{{ emp.phone }}</td>
+          <td class="nowrap">{{ emp.no_rek or '-' }}</td>
+          <td>{{ emp.address }}</td>
+          <td class="nowrap">
+            {% if emp.hire_date %}{{ emp.hire_date|strftime('%d/%m/%Y') }}{% else %}-{% endif %}
+          </td>
+          <td style="min-width:220px;">
+            <a href="{{ url_for('employee_payroll_history', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary">
+              <i class="fa fa-file-invoice-dollar"></i> Detail Payroll
+            </a>
+          </td>
+          <td><span class="badge bg-secondary">Inactive</span></td>
+          <td class="text-center">
+            <form action="{{ url_for('set_employee_active', employee_id=emp.id) }}"
+                  method="post"
+                  onsubmit="return confirm('Aktifkan kembali karyawan ini?');">
+              <button class="btn btn-sm btn-success">
+                <i class="fa fa-undo"></i> Aktifkan
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="10" class="text-center">Tidak ada karyawan di arsip.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

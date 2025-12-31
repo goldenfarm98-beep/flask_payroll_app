@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Tambah Data Payroll</h2>
+<hr>
+
+<!-- ============ FORM GET: pilih karyawan (tetap) ============ -->
+<form method="get" action="{{ url_for('add_payroll') }}" id="emp-select-form">
+  <div class="mb-3">
+    <label for="employee_id" class="form-label">Karyawan</label>
+    <select name="employee_id" id="employee_id" class="form-select">
+      <option value="">-- pilih karyawan --</option>
+      {% for e in employees %}
+      <option value="{{ e.id }}" {% if e.id==selected_emp_id %}selected{% endif %}>{{ e.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label for="pay_period" class="form-label">Periode Gaji</label>
+    <input type="month" id="pay_period" name="pay_period" class="form-control" value="{{ request.args.get('pay_period','') }}">
+    <small class="text-muted">Periode dipakai untuk menarik master komponen.</small>
+  </div>
+</form>
+
+<script>
+  // Auto-submit saat pilihan berubah
+  document.getElementById('employee_id')
+    .addEventListener('change', () => document.getElementById('emp-select-form').submit());
+  const periodInput = document.getElementById('pay_period');
+  if (periodInput) {
+    periodInput.addEventListener('change', () => document.getElementById('emp-select-form').submit());
+  }
+</script>
+
+<!-- ============ FORM POST: isi data payroll ============ -->
+{% if selected_emp_id %}
+<form method="post" action="{{ url_for('add_payroll') }}">
+  <!-- kirim id karyawan yang tadi dipilih -->
+  <input type="hidden" name="employee_id" value="{{ selected_emp_id }}">
+
+  <div class="mb-3">
+    <label for="pay_period" class="form-label">Periode Gaji</label>
+    <input type="month" id="pay_period_post" name="pay_period" class="form-control" value="{{ request.args.get('pay_period','') }}" required>
+  </div>
+
+  <div class="mb-3 form-check">
+    <input type="checkbox" name="is_thr" id="is_thr" class="form-check-input">
+    <label for="is_thr" class="form-check-label">Bulan THR?</label>
+    <small class="text-muted">(Jika dicentang, THR = gaji pokok.)</small>
+  </div>
+
+  {% if master_default %}
+  <div class="alert alert-info d-flex align-items-center justify-content-between">
+    <div>
+      <strong>Master komponen ({{ request.args.get('pay_period','') or 'periode belum dipilih' }}):</strong>
+      Gaji Pokok: Rp. {{ master_default.gaji_pokok|rupiah }},
+      Tunjangan total: Rp. {{ master_default.tunjangan|rupiah }},
+      Potongan total: Rp. {{ master_default.potongan|rupiah }}
+      <div class="small mt-1">
+        {% if master_default.items is iterable %}
+          <ul class="mb-0">
+            {% for it in master_default.items %}
+              <li>{{ it.code }} - {{ it.name }} ({{ it.type }}, {{ it.calc }}): Rp. {{ it.value|rupiah }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <em>Belum ada komponen ter-assign.</em>
+        {% endif %}
+      </div>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="apply-master">Gunakan</button>
+  </div>
+  {% endif %}
+
+  <!-- Baris 1 -->
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">Gaji Pokok</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="gaji_pokok" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">BPJS Ketenagakerjaan</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="bpjs_ketenagakerjaan" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Alpha (hari)</label>
+      <input type="number" name="alpha" class="form-control" step="1">
+    </div>
+  </div>
+
+  <!-- Baris 2 -->
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">Tunjangan Makan</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="tunjangan_makan" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Tunjangan Transport</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="tunjangan_transport" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- Baris 3 -->
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">Tunjangan Lainnya</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="tunjangan_lainnya" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Potongan Gaji</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="potongan_gaji" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+  </div>
+  <!-- Baris 4 -->
+  <div class="row mb-2">
+    {% if payment_choices %}
+    <div class="mb-3">
+      <label class="form-label">Pilih Angsuran (sudah approved):</label>
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Pinjaman ID</th>
+            <th>Cicilan ke</th>
+            <th>Tgl Bayar</th>
+            <th>Nominal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in payment_choices %}
+          <tr>
+            <td><input type="checkbox" name="payments" value="{{ item.payment.id }}"></td>
+            <td>{{ item.loan.id }}</td>
+            <td>{{ item.number }}/{{ item.loan.tenor }}</td>
+            <td>{{ item.payment.payment_date|strftime('%d/%m/%Y') }}</td>
+            <td>Rp. {{ item.payment.payment_amount|rupiah }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+
+    <div class="col-md-4">
+      <label class="form-label">Upah Lembur</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="upah_lembur" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- Tombol Simpan & Kembali -->
+  <button type="submit" class="btn btn-success">
+    <i class="fa fa-save"></i> Simpan
+  </button>
+  <a href="{{ url_for('payrolls') }}" class="btn btn-secondary">Kembali</a>
+</form>
+
+{% else %}
+<div class="alert alert-info">Silakan pilih karyawan terlebih dahulu.</div>
+{% endif %}
+
+{% if master_default %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('apply-master');
+  if (!btn) return;
+  const master = {{ master_default|tojson }};
+  btn.addEventListener('click', () => {
+    const setVal = (name, val) => {
+      const el = document.querySelector(`[name="${name}"]`);
+      if (el) {
+        const num = Number(val || 0);
+        el.value = num.toLocaleString('id-ID').replace(/,/g, '.');
+      }
+    };
+    setVal('gaji_pokok', master.gaji_pokok);
+    setVal('tunjangan_makan', 0);
+    setVal('tunjangan_transport', 0);
+    setVal('tunjangan_lainnya', master.tunjangan);
+    setVal('potongan_gaji', master.potongan);
+  });
+});
+</script>
+{% endif %}
+
+{% endblock %}

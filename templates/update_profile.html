@@ -1,0 +1,50 @@
+{% extends 'base1.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header bg-primary text-white">
+    <h4 class="mb-0">Update Profil Karyawan</h4>
+  </div>
+  <div class="card-body">
+    <form action="{{ url_for('update_profile') }}" method="POST" enctype="multipart/form-data">
+      <div class="row mb-3">
+        <div class="col-md-3 text-center">
+          <!-- Tampilkan foto profil saat ini, jika ada -->
+          <img src="{{ url_for('static', filename='uploads/' ~ employee.photo) if employee.photo else url_for('static', filename='images/yara.png') }}" alt="Foto Profil" class="img-fluid rounded-circle" style="max-width: 150px;">
+          <div class="mt-2">
+            <label for="photo" class="form-label">Upload Foto Profil</label>
+            <input type="file" name="photo" id="photo" class="form-control">
+          </div>
+        </div>
+        <div class="col-md-9">
+          <div class="mb-3">
+            <label for="name" class="form-label">Nama</label>
+            <input type="text" name="name" id="name" class="form-control" value="{{ employee.name }}">
+          </div>
+          <div class="mb-3">
+            <label for="nik" class="form-label">NIK</label>
+            <input type="text" name="nik" id="nik" class="form-control" value="{{ employee.nik }}" readonly>
+          </div>
+          <div class="mb-3">
+            <label for="position" class="form-label">Posisi</label>
+            <input type="text" name="position" id="position" class="form-control" value="{{ employee.position }}">
+          </div>
+          <div class="mb-3">
+            <label for="address" class="form-label">Alamat</label>
+            <textarea name="address" id="address" class="form-control">{{ employee.address }}</textarea>
+          </div>
+          <div class="mb-3">
+            <label for="phone" class="form-label">No. Telp</label>
+            <input type="text" name="phone" id="phone" class="form-control" value="{{ employee.phone }}">
+          </div>
+          <div class="mb-3">
+            <label for="hire_date" class="form-label">Tanggal Masuk</label>
+            <input type="date" name="hire_date" id="hire_date" class="form-control" value="{{ employee.hire_date|strftime('%Y-%m-%d') if employee.hire_date }}">
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+      <a href="{{ url_for('employee_dashboard') }}" class="btn btn-secondary">Batal</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

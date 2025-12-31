@@ -1,0 +1,175 @@
+{% extends 'base1.html' %}
+{% block content %}
+<div class="container my-4">
+  <h2 class="mb-4">Daftar Pengajuan Pinjaman</h2>
+  <hr>
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nama Karyawan</th>
+          <th>Jumlah Pinjaman</th>
+          <th>Sisa Pinjaman</th>
+          <th>Tenor (bulan)</th>
+          
+          <th>Suku Bunga (%)</th>
+          <th>Rincian Cicilan Dibayar</th>
+          <th>Status</th>
+          <th>Tanggal Pengajuan</th>
+          {% if session.get('role') == 'admin' %}
+          <th>Aksi</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for loan in loans %}
+        <tr>
+          <td>{{ loan.id }}</td>
+          <td>{{ loan.employee.name }}</td>
+          <td>{{ loan.amount|rupiah }}</td>
+          <td><span class="badge bg-warning text-dark">{{ loan.remaining|rupiah }}</span></td>
+          <td>{{ loan.tenor }}</td>
+          <!-- <td>{{ loan.paid_installment|rupiah }}</td> -->
+          <td>{{ loan.interest_rate }}</td>
+          <td>
+            {# inisialisasi penampung #}
+            {% set ns = namespace(idx=1, total=0) %}
+
+            {# loop setiap Payment yang sudah disetujui / diposting #}
+            {% for pay in loan.payments if pay.status in ('approved', 'posted') %}
+            {% set ns.total = ns.total + pay.payment_amount %}
+            Cicilan {{ ns.idx }} = {{ pay.payment_amount|rupiah }}<br>
+            {% set ns.idx = ns.idx + 1 %}
+            {% endfor %}
+
+            {# jika belum ada pembayaran, tampilkan strip – #}
+            {% if ns.idx == 1 %}
+            –
+            {% else %}
+            <hr class="my-1">
+            <strong>Total&nbsp;=&nbsp;{{ ns.total|rupiah }}</strong>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if loan.status == 'completed' %}
+            <span class="badge bg-success">
+              <i class="fa fa-check"></i> Completed
+            </span>
+            {% elif loan.status == 'approved' %}
+            <span class="badge bg-info">
+              <i class="fa fa-thumbs-up"></i> Approved
+            </span>
+            {% elif loan.status == 'pending' %}
+            <span class="badge bg-warning text-dark">
+              <i class="fa fa-clock-o"></i> Pending
+            </span>
+            {% elif loan.status == 'rejected' %}
+            <span class="badge bg-danger">
+              <i class="fa fa-times"></i> Rejected
+            </span>
+            {% else %}
+            <span class="badge bg-secondary">{{ loan.status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ loan.application_date|strftime('%d/%m/%Y') }}</td>
+          {% if session.get('role') == 'admin' %}
+          <td>
+            {% if loan.status == 'pending' %}
+            <a href="{{ url_for('approve_loan', loan_id=loan.id) }}" class="btn btn-success btn-sm">
+              <i class="fa fa-check"></i> Setujui
+            </a>
+            <a href="{{ url_for('reject_loan', loan_id=loan.id) }}" class="btn btn-danger btn-sm">
+              <i class="fa fa-times"></i> Tolak
+            </a>
+            {% endif %}
+            <a href="{{ url_for('delete_loan', loan_id=loan.id) }}" class="btn btn-danger btn-sm"
+              onclick="return confirm('Anda yakin ingin menghapus data pinjaman ini?');">
+              <i class="fa fa-trash"></i> Hapus
+            </a>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div><p>Data karyawan yang sudah login di halaman pinjaman</p></div>
+    <table class="table table-striped">
+{% if session.get('role') == 'admin' %}
+<thead>
+  <tr>
+    <th>#</th>
+    <th>Nama Lengkap</th>
+    <th>Email</th>
+    <th>Role</th>
+    <th class="text-center">Aksi</th>
+  </tr>
+</thead>
+<tbody>
+  {% for u in users %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ u.fullname }}</td>
+    <td>{{ u.email }}</td>
+    <td>{{ u.role }}</td>
+    <td class="text-center">
+      <a href="{{ url_for('edit_user', user_id=u.id) }}"
+   class="btn btn-sm btn-info me-1">
+  <i class="fa fa-pencil"></i>
+</a>
+
+      <form action="{{ url_for('delete_user', user_id=u.id) }}"
+            method="post" class="d-inline"
+            onsubmit="return confirm('Hapus user ini?');">
+        <button class="btn btn-sm btn-danger">
+          <i class="fa fa-trash"></i>
+        </button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</tbody>
+{% endif %}
+
+
+
+</table>
+
+  </div>
+
+  {% if session.get('role') == 'admin' and pending_payments %}
+  <h3 class="mt-5">Notifikasi Pembayaran Pending</h3>
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>ID Pembayaran</th>
+          <th>Nama Karyawan</th>
+          <th>Jumlah Bayar</th>
+          <th>Tanggal Pembayaran</th>
+          <th>ID Pinjaman</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for payment in pending_payments %}
+        <tr>
+          <td>{{ payment.id }}</td>
+          <td>{{ payment.loan.employee.name }}</td>
+          <td>{{ payment.payment_amount|rupiah }}</td>
+          <td>{{ payment.payment_date|strftime('%d/%m/%Y') }}</td>
+          <td>{{ payment.loan_id }}</td>
+          <td>
+            <a href="{{ url_for('approve_payment', payment_id=payment.id) }}" class="btn btn-success btn-sm">
+              <i class="fa fa-check"></i> Setujui Pembayaran
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
