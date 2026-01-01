@@ -39,7 +39,7 @@ def upgrade():
             sa.Column('entity_type', sa.String(length=100), nullable=False),
             sa.Column('entity_id', sa.Integer(), nullable=False),
             sa.Column('details', sa.Text(), nullable=True),
-            sa.Column('created_at', sa.DateTime(), nullable=True, server_default=sa.text("(datetime('now'))"))
+            sa.Column('created_at', sa.DateTime(), nullable=True, server_default=sa.text("CURRENT_TIMESTAMP"))
         )
 
 

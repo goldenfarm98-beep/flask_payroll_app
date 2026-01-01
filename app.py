@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date, timezone
@@ -10,6 +10,7 @@ import csv
 import os
 import io
 import secrets
+import json
 from collections import defaultdict
 import pandas as pd
 import pdfkit  # pastikan sudah install pdfkit dan wkhtmltopdf
@@ -17,6 +18,7 @@ from flask_migrate import Migrate
 from flask import request
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
+from decimal import Decimal
 
 
 app = Flask(__name__)
@@ -24,15 +26,80 @@ app = Flask(__name__)
 # SECRET_KEY untuk session
 app.secret_key = "secretkey123"  # Ganti dengan yang lebih aman
 
-# Konfigurasi Database SQLite
+# Konfigurasi Database
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'payroll.db')
+
+
+def get_database_uri():
+    url = os.getenv("DATABASE_URL") or os.getenv("SQLALCHEMY_DATABASE_URI")
+    if url:
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        return url
+    return "sqlite:///" + os.path.join(basedir, "payroll.db")
+
+
+db_url = get_database_uri()
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+search_path = os.getenv("DB_SEARCH_PATH")
+if search_path and db_url.startswith("postgres"):
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        "connect_args": {"options": f"-csearch_path={search_path}"}
+    }
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
 # Inisialisasi Flask-Migrate
 migrate = Migrate(app, db)
+
+# --- Backup helpers ---
+def ensure_backup_dir():
+    backup_dir = os.path.join(basedir, "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+    return backup_dir
+
+
+def serialize_value(value):
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return value.hex()
+    return value
+
+
+def export_database_json():
+    backup_dir = ensure_backup_dir()
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    backend = db.engine.url.get_backend_name()
+    filename = f"backup_{backend}_{timestamp}.json"
+    path = os.path.join(backup_dir, filename)
+
+    metadata = sa.MetaData()
+    metadata.reflect(bind=db.engine)
+
+    data = {
+        "meta": {
+            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "backend": backend,
+            "database": db.engine.url.render_as_string(hide_password=True),
+        },
+        "tables": {},
+    }
+
+    for table in metadata.sorted_tables:
+        rows = db.session.execute(sa.select(table)).mappings().all()
+        data["tables"][table.name] = [
+            {k: serialize_value(v) for k, v in row.items()} for row in rows
+        ]
+
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, ensure_ascii=True, indent=2)
+
+    return path
+
 
 # --- Model Database ---
 class User(db.Model):
@@ -130,12 +197,8 @@ class Payroll(db.Model):
 
     @pay_period_date.expression
     def pay_period_date(cls):
-        # SQLite-friendly conversion "YYYY-MM" -> date
-        return sa.func.date(sa.func.printf(
-            '%s-%s-01',
-            sa.func.substr(cls.pay_period, 1, 4),
-            sa.func.substr(cls.pay_period, 6, 2)
-        ))
+        # Cross-dialect conversion "YYYY-MM" -> date (cast string).
+        return sa.cast(cls.pay_period + '-01', sa.Date)
 
 # === MODEL PINJAMAN ===
 class Loan(db.Model):
@@ -262,10 +325,6 @@ def log_action(action, entity_type, entity_id, details=None):
 
 
 # --- ROUTES ---
-
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'payroll.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Tambahkan baris berikut:
 app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'static/uploads')
@@ -678,6 +737,44 @@ def logout():
     flash('Anda telah keluar.', 'info')
     return redirect(url_for('index'))
 
+
+@app.route('/change_password', methods=['GET', 'POST'])
+def change_password():
+    if 'user_id' not in session:
+        flash('Harap login terlebih dahulu.', 'warning')
+        return redirect(url_for('login'))
+
+    user = User.query.get(session.get('user_id'))
+    if not user:
+        session.clear()
+        flash('Akun tidak ditemukan. Silakan login kembali.', 'danger')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        current_password = request.form.get('current_password') or ''
+        new_password = request.form.get('new_password') or ''
+        confirm_password = request.form.get('confirm_password') or ''
+
+        if not check_password_hash(user.password, current_password):
+            flash('Password saat ini salah.', 'danger')
+            return redirect(url_for('change_password'))
+        if not new_password:
+            flash('Password baru wajib diisi.', 'danger')
+            return redirect(url_for('change_password'))
+        if new_password != confirm_password:
+            flash('Konfirmasi password tidak cocok.', 'danger')
+            return redirect(url_for('change_password'))
+
+        user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
+        db.session.commit()
+        flash('Password berhasil diperbarui.', 'success')
+
+        if session.get('role') == 'admin':
+            return redirect(url_for('dashboard'))
+        return redirect(url_for('employee_profile'))
+
+    return render_template('change_password.html')
+
 @app.route('/dashboard')
 def dashboard():
     # Pastikan hanya user yang sudah login bisa mengakses
@@ -695,8 +792,8 @@ def dashboard():
     now = datetime.now()
     current_period = now.strftime("%Y-%m")
     current_year = now.strftime("%Y")
-    start_date = date(int(current_year), 1, 1)
-    end_date = date(now.year, now.month, 1)
+    start_period = f"{current_year}-01"
+    end_period = current_period
     current_month = now.month
     
     # Total Gaji yang Dibayarkan (misal: jumlah gaji pokok dari payroll bulan ini)
@@ -712,18 +809,18 @@ def dashboard():
 
     # Akumulasi Januari s.d periode aktif (tahun berjalan) dengan filter tahun tegas
     total_gaji_ytd = db.session.query(func.sum(Payroll.gaji_pokok)).filter(
-        Payroll.pay_period_date >= start_date,
-        Payroll.pay_period_date <= end_date
+        Payroll.pay_period >= start_period,
+        Payroll.pay_period <= end_period
     ).scalar() or 0
     total_potongan_ytd = db.session.query(
         func.sum(Payroll.potongan_gaji + Payroll.hutang + (Payroll.alpha * (Payroll.gaji_pokok/30)))
     ).filter(
-        Payroll.pay_period_date >= start_date,
-        Payroll.pay_period_date <= end_date
+        Payroll.pay_period >= start_period,
+        Payroll.pay_period <= end_period
     ).scalar() or 0
     avg_take_home_ytd = db.session.query(func.avg(Payroll.take_home_pay)).filter(
-        Payroll.pay_period_date >= start_date,
-        Payroll.pay_period_date <= end_date
+        Payroll.pay_period >= start_period,
+        Payroll.pay_period <= end_period
     ).scalar() or 0
 
     # Ringkasan per bulan (tahun berjalan)
@@ -733,7 +830,7 @@ def dashboard():
         func.sum(Payroll.potongan_gaji + Payroll.hutang + (Payroll.alpha * (Payroll.gaji_pokok/30))),
         func.avg(Payroll.take_home_pay)
     ).filter(
-        func.strftime('%Y', Payroll.pay_period_date) == current_year
+        func.substr(Payroll.pay_period, 1, 4) == current_year
     ).group_by(Payroll.pay_period).all()
 
     agg_map = {row[0]: row for row in agg_rows}
@@ -765,6 +862,21 @@ def dashboard():
                            current_period=current_period,
                            current_year=current_year,
                            monthly_data=monthly_data)
+
+
+@app.route('/admin/backup', methods=['POST'])
+def admin_backup():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Anda tidak memiliki hak akses.', 'danger')
+        return redirect(url_for('login'))
+
+    try:
+        backup_path = export_database_json()
+    except Exception as exc:
+        flash(f'Gagal membuat backup: {exc}', 'danger')
+        return redirect(url_for('dashboard'))
+
+    return send_file(backup_path, as_attachment=True, download_name=os.path.basename(backup_path))
 
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
 def edit_user(user_id):

@@ -28,8 +28,8 @@ def upgrade():
             sa.Column('comp_type', sa.String(length=20), nullable=False),
             sa.Column('calc_type', sa.String(length=20), nullable=True),
             sa.Column('default_value', sa.Float(), nullable=True),
-            sa.Column('active', sa.Boolean(), nullable=True, server_default=sa.text("1")),
-            sa.Column('created_at', sa.DateTime(), nullable=True, server_default=sa.text("(datetime('now'))"))
+            sa.Column('active', sa.Boolean(), nullable=True, server_default=sa.text("true")),
+            sa.Column('created_at', sa.DateTime(), nullable=True, server_default=sa.text("CURRENT_TIMESTAMP"))
         )
 
     if 'employee_compensation' not in inspector.get_table_names():
@@ -40,7 +40,7 @@ def upgrade():
             sa.Column('component_id', sa.Integer(), sa.ForeignKey('compensation_component.id'), nullable=False),
             sa.Column('value', sa.Float(), nullable=True),
             sa.Column('start_period', sa.String(length=7), nullable=True),
-            sa.Column('active', sa.Boolean(), nullable=True, server_default=sa.text("1"))
+            sa.Column('active', sa.Boolean(), nullable=True, server_default=sa.text("true"))
         )
 
 

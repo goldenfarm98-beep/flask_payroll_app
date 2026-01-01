@@ -1,21 +1,243 @@
 {% extends 'base.html' %}
+
+{% block head %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
-<div class="row">
-  <div class="col-md-6 offset-md-3">
-    <h2>Login</h2>
-    <form method="POST" action="{{ url_for('login') }}">
-      <div class="mb-3">
-        <label for="email" class="form-label">Email</label>
-        <input type="text" name="email" id="email" class="form-control" required>
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --brand: #0f766e;
+    --brand-dark: #115e59;
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --line: #e2e8f0;
+  }
+
+  body {
+    background:
+      radial-gradient(600px 240px at 15% -10%, rgba(14, 116, 144, 0.18), transparent 60%),
+      radial-gradient(700px 300px at 90% 0%, rgba(251, 146, 60, 0.2), transparent 60%),
+      linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  }
+
+  .login-shell {
+    position: relative;
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 0 64px;
+    font-family: "DM Sans", sans-serif;
+  }
+
+  .login-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 0;
+    width: min(980px, 100%);
+    border-radius: 26px;
+    overflow: hidden;
+    box-shadow: 0 28px 60px rgba(15, 23, 42, 0.18);
+    background: var(--surface);
+  }
+
+  .login-left {
+    padding: 42px;
+    background:
+      linear-gradient(160deg, rgba(15, 118, 110, 0.95) 0%, rgba(20, 184, 166, 0.92) 60%, rgba(14, 116, 144, 0.9) 100%);
+    color: #f8fafc;
+    position: relative;
+  }
+
+  .login-left::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(240px 200px at 0% 0%, rgba(255, 255, 255, 0.2), transparent 60%);
+    pointer-events: none;
+  }
+
+  .brand-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .login-left h1 {
+    font-family: "Sora", sans-serif;
+    font-size: clamp(2rem, 2vw + 1.4rem, 2.7rem);
+    margin: 16px 0 12px;
+  }
+
+  .login-left p {
+    color: rgba(248, 250, 252, 0.85);
+    margin-bottom: 28px;
+    max-width: 340px;
+  }
+
+  .feature-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .feature-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .feature-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.16);
+    font-size: 1rem;
+  }
+
+  .feature-text {
+    font-size: 0.92rem;
+  }
+
+  .feature-text strong {
+    display: block;
+    font-weight: 600;
+  }
+
+  .login-form {
+    padding: 40px 42px;
+    background: var(--surface);
+  }
+
+  .login-form h2 {
+    font-family: "Sora", sans-serif;
+    font-size: 1.7rem;
+    margin-bottom: 6px;
+  }
+
+  .login-form .muted {
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .form-control {
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    padding: 12px 14px;
+  }
+
+  .form-control:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 0.18rem rgba(13, 148, 136, 0.2);
+  }
+
+  .btn-login {
+    border-radius: 999px;
+    padding: 12px 16px;
+    font-weight: 600;
+    background: var(--brand);
+    border: none;
+  }
+
+  .btn-login:hover {
+    background: var(--brand-dark);
+  }
+
+  .login-footer {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .login-footer a {
+    color: var(--brand);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .login-footer a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 992px) {
+    .login-card {
+      grid-template-columns: 1fr;
+    }
+
+    .login-left,
+    .login-form {
+      padding: 32px;
+    }
+  }
+</style>
+
+<div class="login-shell">
+  <div class="login-card">
+    <div class="login-left">
+      <div class="brand-pill">
+        <i class="fa fa-coins"></i> Payroll App
       </div>
-      <div class="mb-3">
-        <label for="password" class="form-label">Password</label>
-        <input type="password" name="password" id="password" class="form-control" required>
+      <h1>Selamat datang kembali</h1>
+      <p>Masuk untuk memantau payroll, pinjaman karyawan, dan aktivitas penting dalam satu tempat.</p>
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon"><i class="fa fa-chart-line"></i></div>
+          <div class="feature-text">
+            <strong>Insight cepat</strong>
+            Lihat ringkasan payroll terbaru dan tren biaya.
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon"><i class="fa fa-shield"></i></div>
+          <div class="feature-text">
+            <strong>Kontrol persetujuan</strong>
+            Kelola approval pinjaman dan pembayaran aktif.
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon"><i class="fa fa-users"></i></div>
+          <div class="feature-text">
+            <strong>Data terpusat</strong>
+            Semua informasi karyawan tersimpan rapi.
+          </div>
+        </div>
       </div>
-      <button type="submit" class="btn btn-primary">
-        <i class="fa fa-sign-in-alt"></i> Login
-      </button>
-    </form>
+    </div>
+    <div class="login-form">
+      <h2>Login</h2>
+      <div class="muted">Gunakan akun yang terdaftar di perusahaan.</div>
+      <form method="POST" action="{{ url_for('login') }}">
+        <div class="mb-3">
+          <label for="email" class="form-label">Email</label>
+          <input type="email" name="email" id="email" class="form-control" placeholder="nama@perusahaan.com" required autofocus>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" name="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-login text-white w-100">
+          <i class="fa fa-sign-in-alt"></i> Masuk
+        </button>
+      </form>
+      <div class="login-footer">
+        <span>Belum punya akun?</span>
+        <a href="{{ url_for('register') }}">Register</a>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

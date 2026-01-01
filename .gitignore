@@ -2,7 +2,10 @@
 __pycache__/
 *.pyc
 payroll.db
+payroll.db.backup_*
 *.sqlite*
+recovered.sql
 .env
 .env.*
 .DS_Store
+backups/

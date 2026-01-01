@@ -20,6 +20,29 @@
   .nowrap{ white-space:nowrap; }
   .search-hint{ font-size:.85rem; color:#6b7280; }
   .badge-empty{ color:#64748b; background:#e2e8f0; }
+  /* ====== Employees Mobile Responsive ====== */
+  @media (max-width: 768px){
+    .page-header{ flex-direction:column; align-items:flex-start; }
+    .page-header .d-flex{ width:100%; flex-wrap:wrap; }
+    .table-wrap{ box-shadow:none; border-radius:0; }
+    .table-responsive{ overflow-x:visible; }
+    #employeesTable thead{ display:none; }
+    #employeesTable, #employeesTable tbody, #employeesTable tr, #employeesTable td{ display:block; width:100%; }
+    #employeesTable tbody tr{
+      margin-bottom:1rem; background:#fff; border-radius:12px;
+      box-shadow:0 8px 18px rgba(0,0,0,.06); padding:.5rem .75rem;
+    }
+    #employeesTable tbody td{
+      padding:.45rem 0; border:0; display:flex; justify-content:space-between; gap:1rem;
+    }
+    #employeesTable tbody td::before{
+      content:attr(data-label); font-weight:600; color:#64748b; min-width:120px;
+    }
+    #employeesTable tbody td.text-center{ justify-content:flex-start; }
+    #employeesTable tbody td.text-center::before{ min-width:120px; }
+    #employeesTable .btn-group{ width:100%; flex-wrap:wrap; gap:.5rem; }
+    #employeesTable .btn-group .btn{ flex:1 1 auto; }
+  }
 </style>
 
 <div class="page-header">
@@ -147,31 +170,31 @@
       <tbody>
         {% for emp in employees_data %}
         <tr>
-          <td class="nowrap">{{ emp.id }}</td>
-          <td class="nowrap">{{ emp.nik }}</td>
-          <td>{{ emp.name }}</td>
-          <td>{{ emp.position }}</td>
-          <td class="nowrap">{{ emp.phone }}</td>
-          <td class="nowrap">
+          <td class="nowrap" data-label="ID">{{ emp.id }}</td>
+          <td class="nowrap" data-label="NIK">{{ emp.nik }}</td>
+          <td data-label="Nama">{{ emp.name }}</td>
+          <td data-label="Posisi">{{ emp.position }}</td>
+          <td class="nowrap" data-label="No. HP">{{ emp.phone }}</td>
+          <td class="nowrap" data-label="No. Rek">
             {% if emp.no_rek %}{{ emp.no_rek }}{% else %}
               <span class="badge badge-empty">-</span>
             {% endif %}
           </td>
-          <td>{{ emp.address }}</td>
-          <td class="nowrap">
+          <td data-label="Alamat">{{ emp.address }}</td>
+          <td class="nowrap" data-label="Tgl Masuk">
             {% if emp.hire_date %}{{ emp.hire_date|strftime('%d/%m/%Y') }}{% else %}-{% endif %}
           </td>
           <!-- sel diisi via JS agar tanpa ubah backend -->
-          <td class="nowrap masa-kerja"
+          <td class="nowrap masa-kerja" data-label="Masa Kerja"
               data-hire="{{ emp.hire_date.isoformat() if emp.hire_date else '' }}"></td>
-          <td class="nowrap">
+          <td class="nowrap" data-label="Status">
             {% if emp.status == 'inactive' %}
               <span class="badge bg-secondary">Inactive</span>
             {% else %}
               <span class="badge bg-success">Active</span>
             {% endif %}
           </td>
-          <td class="text-center">
+          <td class="text-center" data-label="Aksi">
             <div class="btn-group">
               <a href="{{ url_for('edit_employee', employee_id=emp.id) }}" class="btn btn-outline-secondary btn-sm">
                 <i class="fa fa-edit"></i> Edit

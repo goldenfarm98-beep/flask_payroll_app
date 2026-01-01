@@ -1,30 +1,248 @@
 {% extends 'base.html' %}
+
+{% block head %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
-<div class="row">
-  <div class="col-md-6 offset-md-3">
-    <h2>Register</h2>
-    <form method="POST" action="{{ url_for('register') }}">
-      <div class="mb-3">
-        <label for="fullname" class="form-label">Full Name</label>
-        <input type="text" name="fullname" id="fullname" class="form-control" required>
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --brand: #2563eb;
+    --brand-dark: #1d4ed8;
+    --surface: #ffffff;
+    --line: #e2e8f0;
+  }
+
+  body {
+    background:
+      radial-gradient(640px 260px at 12% -8%, rgba(37, 99, 235, 0.18), transparent 60%),
+      radial-gradient(680px 260px at 92% 0%, rgba(34, 197, 94, 0.16), transparent 60%),
+      linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  }
+
+  .register-shell {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 0 64px;
+    font-family: "DM Sans", sans-serif;
+  }
+
+  .register-card {
+    width: min(980px, 100%);
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    border-radius: 26px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 26px 58px rgba(15, 23, 42, 0.18);
+  }
+
+  .register-form {
+    padding: 40px 42px;
+  }
+
+  .register-form h2 {
+    font-family: "Sora", sans-serif;
+    font-size: 1.8rem;
+    margin-bottom: 6px;
+  }
+
+  .register-form .muted {
+    color: var(--muted);
+    margin-bottom: 22px;
+  }
+
+  .form-control {
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    padding: 12px 14px;
+  }
+
+  .form-control:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 0.18rem rgba(37, 99, 235, 0.2);
+  }
+
+  .btn-register {
+    border-radius: 999px;
+    padding: 12px 16px;
+    font-weight: 600;
+    background: var(--brand);
+    border: none;
+  }
+
+  .btn-register:hover {
+    background: var(--brand-dark);
+  }
+
+  .register-aside {
+    padding: 42px;
+    color: #0f172a;
+    background:
+      linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.95) 60%, rgba(236, 253, 245, 0.9) 100%);
+    position: relative;
+  }
+
+  .register-aside::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(240px 200px at 100% 0%, rgba(37, 99, 235, 0.1), transparent 60%);
+    pointer-events: none;
+  }
+
+  .aside-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  .register-aside h3 {
+    font-family: "Sora", sans-serif;
+    font-size: 1.6rem;
+    margin: 16px 0 12px;
+  }
+
+  .register-aside p {
+    color: var(--muted);
+    margin-bottom: 22px;
+  }
+
+  .guide-list {
+    display: grid;
+    gap: 14px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .guide-item {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .guide-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.95rem;
+  }
+
+  .guide-text strong {
+    display: block;
+    font-weight: 600;
+  }
+
+  .register-footer {
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 0.95rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .register-footer a {
+    color: var(--brand);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .register-footer a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 992px) {
+    .register-card {
+      grid-template-columns: 1fr;
+    }
+
+    .register-form,
+    .register-aside {
+      padding: 32px;
+    }
+  }
+</style>
+
+<div class="register-shell">
+  <div class="register-card">
+    <div class="register-form">
+      <h2>Buat akun</h2>
+      <div class="muted">Lengkapi data agar akun terhubung ke profil karyawan.</div>
+      <form method="POST" action="{{ url_for('register') }}">
+        <div class="mb-3">
+          <label for="fullname" class="form-label">Nama lengkap</label>
+          <input type="text" name="fullname" id="fullname" class="form-control" placeholder="Nama sesuai data karyawan" required>
+        </div>
+        <div class="mb-3">
+          <label for="nik" class="form-label">NIK</label>
+          <input type="text" name="nik" id="nik" class="form-control" placeholder="EMP0001" required>
+        </div>
+        <div class="mb-3">
+          <label for="email" class="form-label">Email perusahaan</label>
+          <input type="email" name="email" id="email" class="form-control" placeholder="nama@goldenfarm99.com" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" name="password" id="password" class="form-control" placeholder="Minimal 8 karakter" autocomplete="new-password" required>
+        </div>
+        <button type="submit" class="btn btn-register text-white w-100">
+          <i class="fa fa-user-plus"></i> Daftar
+        </button>
+      </form>
+      <div class="register-footer">
+        <span>Sudah punya akun?</span>
+        <a href="{{ url_for('login') }}">Login</a>
       </div>
-      <!-- Field NIK ditambahkan -->
-      <div class="mb-3">
-        <label for="nik" class="form-label">NIK</label>
-        <input type="text" name="nik" id="nik" class="form-control" placeholder="EMP0001" required>
+    </div>
+
+    <aside class="register-aside">
+      <div class="aside-pill">
+        <i class="fa fa-id-badge"></i> Panduan registrasi
       </div>
-      <div class="mb-3">
-        <label for="email" class="form-label">Email</label>
-        <input type="email" name="email" id="email" class="form-control" required>
-      </div>
-      <div class="mb-3">
-        <label for="password" class="form-label">Password</label>
-        <input type="password" name="password" id="password" class="form-control" required>
-      </div>
-      <button type="submit" class="btn btn-success">
-        <i class="fa fa-user-plus"></i> Daftar
-      </button>
-    </form>
+      <h3>Pastikan data sesuai</h3>
+      <p>Registrasi hanya untuk karyawan aktif dengan email resmi perusahaan.</p>
+      <ul class="guide-list">
+        <li class="guide-item">
+          <div class="guide-icon"><i class="fa fa-envelope"></i></div>
+          <div class="guide-text">
+            <strong>Email perusahaan</strong>
+            Gunakan domain goldenfarm99.com sesuai kebijakan.
+          </div>
+        </li>
+        <li class="guide-item">
+          <div class="guide-icon"><i class="fa fa-address-card"></i></div>
+          <div class="guide-text">
+            <strong>NIK valid</strong>
+            Cocokkan dengan data karyawan yang sudah ada.
+          </div>
+        </li>
+        <li class="guide-item">
+          <div class="guide-icon"><i class="fa fa-lock"></i></div>
+          <div class="guide-text">
+            <strong>Password aman</strong>
+            Disarankan kombinasi huruf dan angka.
+          </div>
+        </li>
+      </ul>
+    </aside>
   </div>
 </div>
 {% endblock %}
