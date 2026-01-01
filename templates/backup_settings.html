@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-1">Pengaturan Backup</h3>
+    <p class="text-muted mb-0">Atur backup otomatis dan kelola arsip backup.</p>
+  </div>
+  <form method="POST" class="mt-2 mt-md-0">
+    <input type="hidden" name="action" value="run_now">
+    <button type="submit" class="btn btn-outline-secondary">
+      <i class="fa fa-download"></i> Backup Sekarang
+    </button>
+  </form>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Jadwal Otomatis</h5>
+        <form method="POST">
+          <input type="hidden" name="action" value="save">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="enabled" name="enabled"
+                   {% if settings.enabled %}checked{% endif %}>
+            <label class="form-check-label" for="enabled">Aktifkan backup otomatis</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="interval_hours">Interval backup (jam)</label>
+            <input class="form-control" type="number" id="interval_hours" name="interval_hours"
+                   min="1" max="720" value="{{ settings.interval_hours }}">
+            <div class="form-text">Contoh: 24 untuk backup harian.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="retention_count">Simpan backup terakhir (jumlah file)</label>
+            <input class="form-control" type="number" id="retention_count" name="retention_count"
+                   min="1" max="365" value="{{ settings.retention_count }}">
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa fa-save"></i> Simpan Pengaturan
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Status Backup</h5>
+        <div class="list-group list-group-flush">
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Status terakhir</span>
+            {% if settings.last_status == 'success' %}
+              <span class="text-success">success</span>
+            {% elif settings.last_status == 'failed' %}
+              <span class="text-danger">failed</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Backup terakhir</span>
+            <span>
+              {% if settings.last_run_at %}
+                {{ settings.last_run_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+              {% else %}
+                -
+              {% endif %}
+            </span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Backup berikutnya</span>
+            <span>
+              {% if settings.next_run_at %}
+                {{ settings.next_run_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+              {% else %}
+                -
+              {% endif %}
+            </span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>File terakhir</span>
+            <span>{{ settings.last_backup_file or "-" }}</span>
+          </div>
+          {% if settings.last_error %}
+          <div class="list-group-item">
+            <div class="text-danger small">Error terakhir: {{ settings.last_error }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Arsip Backup</h5>
+        {% if backup_files %}
+          <div class="list-group">
+            {% for file in backup_files %}
+            <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div>
+                <div class="fw-semibold">{{ file.name }}</div>
+                <small class="text-muted">
+                  {{ file.mtime.strftime("%Y-%m-%d %H:%M:%S") }} UTC • {{ (file.size / 1024)|round(1) }} KB
+                </small>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('download_backup', filename=file.name) }}">
+                  <i class="fa fa-download"></i> Download
+                </a>
+                <form method="POST" action="{{ url_for('delete_backup', filename=file.name) }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"
+                          onclick="return confirm('Hapus backup ini?');">
+                    <i class="fa fa-trash"></i> Hapus
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted">Belum ada backup tersimpan.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

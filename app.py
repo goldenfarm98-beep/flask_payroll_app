@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, abort, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from sqlalchemy import func
 from sqlalchemy.ext.hybrid import hybrid_property
 from flask import make_response
@@ -11,6 +11,8 @@ import os
 import io
 import secrets
 import json
+import threading
+import time
 from collections import defaultdict
 import pandas as pd
 import pdfkit  # pastikan sudah install pdfkit dan wkhtmltopdf
@@ -108,6 +110,158 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(50), default='user')  # misal 'admin' atau 'user'
+
+
+class BackupSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    interval_hours = db.Column(db.Integer, nullable=False, default=24)
+    retention_count = db.Column(db.Integer, nullable=False, default=7)
+    next_run_at = db.Column(db.DateTime, nullable=True)
+    last_run_at = db.Column(db.DateTime, nullable=True)
+    last_status = db.Column(db.String(20), nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    last_backup_file = db.Column(db.String(255), nullable=True)
+
+
+AUTO_BACKUP_POLL_SECONDS = max(10, int(os.getenv("AUTO_BACKUP_POLL_SECONDS", "60")))
+backup_worker_thread = None
+backup_worker_lock = threading.Lock()
+backup_run_lock = threading.Lock()
+
+
+def get_backup_settings(create_if_missing=True):
+    try:
+        settings = BackupSettings.query.first()
+    except Exception:
+        db.session.rollback()
+        return None
+
+    if not settings and create_if_missing:
+        settings = BackupSettings(
+            enabled=False,
+            interval_hours=24,
+            retention_count=7,
+        )
+        db.session.add(settings)
+        db.session.commit()
+
+    return settings
+
+
+def compute_next_run(now, interval_hours):
+    hours = max(1, int(interval_hours or 24))
+    return now + timedelta(hours=hours)
+
+
+def list_backup_files(limit=10):
+    backup_dir = ensure_backup_dir()
+    files = []
+
+    try:
+        for entry in os.scandir(backup_dir):
+            if not entry.is_file():
+                continue
+            if not entry.name.startswith("backup_") or not entry.name.endswith(".json"):
+                continue
+            stat = entry.stat()
+            files.append({
+                "name": entry.name,
+                "mtime": datetime.utcfromtimestamp(stat.st_mtime),
+                "size": stat.st_size,
+            })
+    except FileNotFoundError:
+        return []
+
+    files.sort(key=lambda item: item["mtime"], reverse=True)
+    if limit:
+        return files[:limit]
+    return files
+
+
+def prune_old_backups(retention_count):
+    retention = max(1, int(retention_count or 7))
+    backup_dir = ensure_backup_dir()
+    files = list_backup_files(limit=None)
+
+    for item in files[retention:]:
+        try:
+            os.remove(os.path.join(backup_dir, item["name"]))
+        except OSError:
+            continue
+
+
+def run_scheduled_backup():
+    if not backup_run_lock.acquire(blocking=False):
+        return
+
+    try:
+        with app.app_context():
+            settings = get_backup_settings(create_if_missing=False)
+            if not settings or not settings.enabled:
+                return
+
+            now = datetime.utcnow()
+            if settings.next_run_at and now < settings.next_run_at:
+                return
+
+            backup_path = export_database_json()
+            settings.last_run_at = now
+            settings.last_status = "success"
+            settings.last_error = None
+            settings.last_backup_file = os.path.basename(backup_path)
+            settings.next_run_at = compute_next_run(now, settings.interval_hours)
+            db.session.commit()
+            prune_old_backups(settings.retention_count)
+    except Exception as exc:
+        with app.app_context():
+            db.session.rollback()
+            settings = get_backup_settings(create_if_missing=False)
+            if settings:
+                settings.last_run_at = datetime.utcnow()
+                settings.last_status = "failed"
+                settings.last_error = str(exc)
+                settings.next_run_at = compute_next_run(settings.last_run_at, settings.interval_hours)
+                db.session.commit()
+    finally:
+        backup_run_lock.release()
+
+
+def auto_backup_loop():
+    while True:
+        try:
+            run_scheduled_backup()
+        except Exception:
+            app.logger.exception("Auto backup gagal.")
+        time.sleep(AUTO_BACKUP_POLL_SECONDS)
+
+
+def should_start_backup_worker():
+    if os.getenv("AUTO_BACKUP_DISABLED") == "1":
+        return False
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    if os.getenv("FLASK_RUN_FROM_CLI") == "true":
+        return os.getenv("WERKZEUG_RUN_MAIN") == "true"
+    return True
+
+
+def start_backup_worker():
+    global backup_worker_thread
+    if not should_start_backup_worker():
+        return
+    with backup_worker_lock:
+        if backup_worker_thread and backup_worker_thread.is_alive():
+            return
+        backup_worker_thread = threading.Thread(
+            target=auto_backup_loop,
+            name="auto-backup",
+            daemon=True,
+        )
+        backup_worker_thread.start()
+
+
+start_backup_worker()
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -862,6 +1016,125 @@ def dashboard():
                            current_period=current_period,
                            current_year=current_year,
                            monthly_data=monthly_data)
+
+
+@app.route('/admin/backup/settings', methods=['GET', 'POST'])
+def backup_settings():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Anda tidak memiliki hak akses.', 'danger')
+        return redirect(url_for('login'))
+
+    settings = get_backup_settings()
+    if not settings:
+        flash('Pengaturan backup belum tersedia. Jalankan migrasi database.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'save')
+        if action == 'save':
+            enabled = request.form.get('enabled') == 'on'
+            previous_enabled = settings.enabled
+            previous_interval = settings.interval_hours
+
+            try:
+                interval_hours = int(request.form.get('interval_hours') or settings.interval_hours or 24)
+            except ValueError:
+                interval_hours = settings.interval_hours or 24
+            try:
+                retention_count = int(request.form.get('retention_count') or settings.retention_count or 7)
+            except ValueError:
+                retention_count = settings.retention_count or 7
+
+            interval_hours = max(1, min(interval_hours, 720))
+            retention_count = max(1, min(retention_count, 365))
+
+            settings.enabled = enabled
+            settings.interval_hours = interval_hours
+            settings.retention_count = retention_count
+
+            if enabled:
+                if (not settings.next_run_at) or (not previous_enabled) or (previous_interval != interval_hours):
+                    settings.next_run_at = compute_next_run(datetime.utcnow(), interval_hours)
+            else:
+                settings.next_run_at = None
+
+            db.session.commit()
+            flash('Pengaturan backup berhasil disimpan.', 'success')
+            return redirect(url_for('backup_settings'))
+
+        if action == 'run_now':
+            try:
+                backup_path = export_database_json()
+                now = datetime.utcnow()
+                settings.last_run_at = now
+                settings.last_status = "success"
+                settings.last_error = None
+                settings.last_backup_file = os.path.basename(backup_path)
+                if settings.enabled:
+                    settings.next_run_at = compute_next_run(now, settings.interval_hours)
+                db.session.commit()
+                prune_old_backups(settings.retention_count)
+                flash('Backup berhasil dibuat.', 'success')
+            except Exception as exc:
+                db.session.rollback()
+                settings = get_backup_settings(create_if_missing=False)
+                if settings:
+                    settings.last_run_at = datetime.utcnow()
+                    settings.last_status = "failed"
+                    settings.last_error = str(exc)
+                    settings.next_run_at = compute_next_run(settings.last_run_at, settings.interval_hours)
+                    db.session.commit()
+                flash(f'Gagal membuat backup: {exc}', 'danger')
+            return redirect(url_for('backup_settings'))
+
+    backup_files = list_backup_files(limit=10)
+    return render_template(
+        'backup_settings.html',
+        settings=settings,
+        backup_files=backup_files
+    )
+
+
+@app.route('/admin/backup/download/<path:filename>')
+def download_backup(filename):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Anda tidak memiliki hak akses.', 'danger')
+        return redirect(url_for('login'))
+
+    safe_name = secure_filename(filename or "")
+    if not safe_name:
+        abort(404)
+
+    backup_dir = ensure_backup_dir()
+    path = os.path.join(backup_dir, safe_name)
+    if not os.path.isfile(path):
+        abort(404)
+
+    return send_file(path, as_attachment=True, download_name=safe_name)
+
+
+@app.route('/admin/backup/delete/<path:filename>', methods=['POST'])
+def delete_backup(filename):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Anda tidak memiliki hak akses.', 'danger')
+        return redirect(url_for('login'))
+
+    safe_name = secure_filename(filename or "")
+    if not safe_name:
+        abort(404)
+
+    backup_dir = ensure_backup_dir()
+    path = os.path.join(backup_dir, safe_name)
+    if not os.path.isfile(path):
+        abort(404)
+
+    try:
+        os.remove(path)
+        flash('Backup berhasil dihapus.', 'success')
+    except OSError as exc:
+        flash(f'Gagal menghapus backup: {exc}', 'danger')
+
+    return redirect(url_for('backup_settings'))
 
 
 @app.route('/admin/backup', methods=['POST'])
