@@ -44,6 +44,10 @@
     <p><strong>Karyawan :</strong> {{ payroll.employee.name }} ({{ payroll.employee.nik }})</p>
     <p><strong>Jabatan :</strong> {{ payroll.employee.position or '-' }}</p>
     <p><strong>Periode :</strong> {{ payroll.pay_period or '-' }}</p>
+    {% if payroll.status == 'rejected' and payroll.reject_reason %}
+    <p><strong>Status :</strong> <span class="text-danger">Ditolak</span></p>
+    <p><strong>Alasan :</strong> {{ payroll.reject_reason }}</p>
+    {% endif %}
   </div>
   <div class="col-md-6 text-end">
     <p><strong>Tanggal Masuk :</strong>
@@ -65,10 +69,6 @@
       <tr>
         <td>Gaji Pokok</td>
         <td class="text-end">Rp. {{ payroll.gaji_pokok|rupiah }}</td>
-      </tr>
-      <tr>
-        <td>BPJS Ketenagakerjaan</td>
-        <td class="text-end">Rp. {{ payroll.bpjs_ketenagakerjaan|rupiah }}</td>
       </tr>
       <tr>
         <td>Tunjangan Makan</td>
@@ -104,6 +104,19 @@
       <tr>
         <td>Alpha ({{ payroll.alpha }} hari)</td>
         <td class="text-end">Rp. {{ pot_alpha|rupiah }}</td>
+      </tr>
+
+      <tr>
+        <td>BPJS Ketenagakerjaan</td>
+        <td class="text-end">Rp. {{ payroll.bpjs_ketenagakerjaan|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>BPJS Kesehatan</td>
+        <td class="text-end">Rp. {{ payroll.bpjs_kesehatan|rupiah }}</td>
+      </tr>
+      <tr>
+        <td>PPH21</td>
+        <td class="text-end">Rp. {{ payroll.pph21|rupiah }}</td>
       </tr>
 
       {#–– Potongan Gaji Lain ––#}

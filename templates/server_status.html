@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-1">Status Server</h3>
+    <p class="text-muted mb-0">Ringkasan kondisi database, backup, dan server.</p>
+  </div>
+  <div class="text-muted small mt-2 mt-md-0">
+    Update: {{ server_time.strftime("%Y-%m-%d %H:%M:%S") }} lokal
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3"><i class="fa fa-database"></i> Database</h5>
+        <div class="list-group list-group-flush">
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Nama database</span>
+            <span>{{ db_name }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Backend</span>
+            <span>{{ db_backend }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Lokasi penyimpanan</span>
+            <span class="text-end text-break small">{{ db_location }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Ukuran database</span>
+            <span>{{ db_size }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Status koneksi</span>
+            {% if connection_ok %}
+              <span class="text-success">Terkoneksi</span>
+            {% else %}
+              <span class="text-danger">Gagal</span>
+            {% endif %}
+          </div>
+          <div class="list-group-item">
+            <div class="text-muted small text-break">URI: {{ db_uri }}</div>
+            {% if not connection_ok and connection_error %}
+              <div class="text-danger small mt-1">Error: {{ connection_error }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3"><i class="fa fa-archive"></i> Backup</h5>
+        {% if backup_settings %}
+        <div class="list-group list-group-flush">
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Backup otomatis</span>
+            {% if backup_settings.enabled %}
+              <span class="text-success">Aktif</span>
+            {% else %}
+              <span class="text-muted">Nonaktif</span>
+            {% endif %}
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Interval</span>
+            <span>{{ backup_settings.interval_hours }} jam</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Retensi file</span>
+            <span>{{ backup_settings.retention_count }} file</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Backup terakhir</span>
+            <span>
+              {% if backup_settings.last_run_at %}
+                {{ backup_settings.last_run_at.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+              {% else %}
+                -
+              {% endif %}
+            </span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Arsip lokal terakhir</span>
+            <span>
+              {% if backup_last_mtime %}
+                {{ backup_last_mtime.strftime("%Y-%m-%d %H:%M:%S") }} UTC
+              {% else %}
+                -
+              {% endif %}
+            </span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>File arsip lokal</span>
+            <span>
+              {% if backup_last_file %}
+                {{ backup_last_file }}
+              {% else %}
+                -
+              {% endif %}
+            </span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Jumlah file</span>
+            <span>{{ backup_count }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Total ukuran backup</span>
+            <span>{{ backup_total_size }}</span>
+          </div>
+          <div class="list-group-item">
+            <div class="text-muted small text-break">Folder: {{ backup_dir }}</div>
+            {% if backup_settings.last_error %}
+              <div class="text-danger small mt-1">Error terakhir: {{ backup_settings.last_error }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+          <div class="text-muted">Pengaturan backup belum tersedia.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3"><i class="fa fa-chart-bar"></i> Metrik Operasional</h5>
+        <div class="list-group list-group-flush">
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Total user</span>
+            <span>{{ total_users }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Total karyawan</span>
+            <span>{{ total_employees }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Total payroll</span>
+            <span>{{ total_payrolls }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3"><i class="fa fa-hdd"></i> Kapasitas Disk</h5>
+        <div class="list-group list-group-flush">
+          <div class="list-group-item">
+            <div class="fw-semibold">Disk database</div>
+            {% if db_disk_usage %}
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <span>Total</span>
+                <span>{{ db_disk_usage.total }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span>Terpakai</span>
+                <span>{{ db_disk_usage.used }} ({{ db_disk_usage.percent }})</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span>Sisa</span>
+                <span>{{ db_disk_usage.free }}</span>
+              </div>
+            {% else %}
+              <div class="text-muted small mt-1">{{ db_disk_note }}</div>
+            {% endif %}
+          </div>
+          <div class="list-group-item">
+            <div class="fw-semibold">Disk backup</div>
+            {% if backup_disk_usage %}
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <span>Total</span>
+                <span>{{ backup_disk_usage.total }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span>Terpakai</span>
+                <span>{{ backup_disk_usage.used }} ({{ backup_disk_usage.percent }})</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span>Sisa</span>
+                <span>{{ backup_disk_usage.free }}</span>
+              </div>
+            {% else %}
+              <div class="text-muted small mt-1">Tidak tersedia.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3"><i class="fa fa-server"></i> Informasi Server</h5>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="list-group list-group-flush">
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>Waktu server (lokal)</span>
+                <span>{{ server_time.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+              </div>
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>Waktu server (UTC)</span>
+                <span>{{ server_time_utc.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+              </div>
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>Python</span>
+                <span>{{ python_version }}</span>
+              </div>
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>Flask</span>
+                <span>{{ flask_version }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="list-group list-group-flush">
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>OS</span>
+                <span class="text-end text-break small">{{ system_info }}</span>
+              </div>
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>Root aplikasi</span>
+                <span class="text-end text-break small">{{ app_root }}</span>
+              </div>
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>URI database</span>
+                <span class="text-end text-break small">{{ db_uri }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

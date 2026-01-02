@@ -120,6 +120,13 @@
               <input type="text" name="no_rek" class="form-control" placeholder="Nomor rekening bank">
             </div>
           </div>
+          <div class="col-md-4">
+            <label class="form-label">Nama Bank</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fa fa-university"></i></span>
+              <input type="text" name="bank_name" class="form-control" placeholder="Contoh: BCA">
+            </div>
+          </div>
 
           <div class="col-12 d-flex gap-2">
             <button type="submit" class="btn btn-primary">
@@ -134,6 +141,48 @@
       <div class="mt-2 search-hint d-md-none">
         Tip: Gunakan kotak cari di bawah tabel untuk filter cepat.
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Import Employee (Collapsible Card) ===== -->
+<div class="card card-elev mb-3">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="fa fa-file-excel-o me-2"></i>Import Karyawan (Excel/CSV)</span>
+    <button class="btn btn-sm btn-light border" type="button" data-bs-toggle="collapse" data-bs-target="#importFormWrap">
+      <i class="fa fa-chevron-down"></i>
+    </button>
+  </div>
+  <div id="importFormWrap" class="collapse">
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('import_employees') }}" enctype="multipart/form-data">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label">File Excel/CSV</label>
+            <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.csv" required>
+          </div>
+          <div class="col-md-4">
+            <div class="form-check mt-4">
+              <input class="form-check-input" type="checkbox" id="update_existing" name="update_existing" checked>
+              <label class="form-check-label" for="update_existing">
+                Update jika NIK sudah ada
+              </label>
+            </div>
+          </div>
+          <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-primary">
+              <i class="fa fa-upload"></i> Import
+            </button>
+          </div>
+        </div>
+        <div class="form-text mt-2">
+          Kolom yang didukung: NIK, Nama, Jabatan/Posisi, Alamat, Telepon/No. HP,
+          No. Rekening, Nama Bank, Tanggal Masuk.
+          <a href="{{ url_for('static', filename='templates/employee_import_template.xlsx') }}" class="ms-2">
+            Download template Excel
+          </a>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -160,6 +209,7 @@
           <th>Posisi</th>
           <th class="nowrap">No. HP</th>
           <th class="nowrap">No. Rek</th>
+          <th>Nama Bank</th>
           <th>Alamat</th>
           <th class="nowrap">Tgl Masuk</th>
           <th class="nowrap">Masa Kerja</th> <!-- BARU -->
@@ -177,6 +227,11 @@
           <td class="nowrap" data-label="No. HP">{{ emp.phone }}</td>
           <td class="nowrap" data-label="No. Rek">
             {% if emp.no_rek %}{{ emp.no_rek }}{% else %}
+              <span class="badge badge-empty">-</span>
+            {% endif %}
+          </td>
+          <td data-label="Nama Bank">
+            {% if emp.bank_name %}{{ emp.bank_name }}{% else %}
               <span class="badge badge-empty">-</span>
             {% endif %}
           </td>

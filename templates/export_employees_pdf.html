@@ -19,6 +19,8 @@
                 <th>Jabatan</th>
                 <th>Alamat</th>
                 <th>Telepon</th>
+                <th>No. Rekening</th>
+                <th>Nama Bank</th>
                 <th>Tanggal Masuk</th>
             </tr>
         </thead>
@@ -31,6 +33,8 @@
                 <td>{{ emp.position }}</td>
                 <td>{{ emp.address }}</td>
                 <td>{{ emp.phone }}</td>
+                <td>{{ emp.no_rek or '' }}</td>
+                <td>{{ emp.bank_name or '' }}</td>
                 <td>{{ emp.hire_date|strftime if emp.hire_date else '' }}</td>
             </tr>
             {% endfor %}

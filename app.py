@@ -13,6 +13,9 @@ import secrets
 import json
 import threading
 import time
+import platform
+import flask
+import shutil
 from collections import defaultdict
 import pandas as pd
 import pdfkit  # pastikan sudah install pdfkit dan wkhtmltopdf
@@ -50,6 +53,12 @@ if search_path and db_url.startswith("postgres"):
     }
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+BPJS_KETENAGAKERJAAN_RATE = float(os.getenv("BPJS_KETENAGAKERJAAN_RATE", "0.02"))
+BPJS_KESEHATAN_RATE = float(os.getenv("BPJS_KESEHATAN_RATE", "0.01"))
+BPJS_KESEHATAN_CAP = float(os.getenv("BPJS_KESEHATAN_CAP", "12000000"))
+PPH21_RATE = float(os.getenv("PPH21_RATE", "0.05"))
+PPH21_PTKP_MONTHLY = float(os.getenv("PPH21_PTKP_MONTHLY", "4500000"))
+
 db = SQLAlchemy(app)
 
 # Inisialisasi Flask-Migrate
@@ -74,7 +83,7 @@ def serialize_value(value):
 
 def export_database_json():
     backup_dir = ensure_backup_dir()
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
     backend = db.engine.url.get_backend_name()
     filename = f"backup_{backend}_{timestamp}.json"
     path = os.path.join(backup_dir, filename)
@@ -84,7 +93,7 @@ def export_database_json():
 
     data = {
         "meta": {
-            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "exported_at": utcnow().isoformat() + "Z",
             "backend": backend,
             "database": db.engine.url.render_as_string(hide_password=True),
         },
@@ -101,6 +110,70 @@ def export_database_json():
         json.dump(data, handle, ensure_ascii=True, indent=2)
 
     return path
+
+
+def format_bytes(size):
+    if size is None:
+        return "-"
+    try:
+        value = float(size)
+    except (TypeError, ValueError):
+        return "-"
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if value < 1024 or unit == "TB":
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} TB"
+
+
+def get_disk_usage(path):
+    if not path:
+        return None
+    try:
+        usage = shutil.disk_usage(path)
+    except (FileNotFoundError, OSError):
+        return None
+    total = usage.total
+    used = usage.used
+    free = usage.free
+    percent = (used / total * 100) if total else None
+    return {
+        "total": format_bytes(total),
+        "used": format_bytes(used),
+        "free": format_bytes(free),
+        "percent": f"{percent:.1f}%" if percent is not None else "-",
+    }
+
+
+def parse_currency(value):
+    raw = str(value or "").replace(".", "").replace(",", "").strip()
+    try:
+        return float(raw) if raw else 0.0
+    except ValueError:
+        return 0.0
+
+
+def compute_bpjs_ketenagakerjaan(gaji_pokok):
+    return round(max(0.0, gaji_pokok) * BPJS_KETENAGAKERJAAN_RATE, 2)
+
+
+def compute_bpjs_kesehatan(gaji_pokok):
+    base = max(0.0, gaji_pokok)
+    cap = BPJS_KESEHATAN_CAP
+    if cap and cap > 0:
+        base = min(base, cap)
+    return round(base * BPJS_KESEHATAN_RATE, 2)
+
+
+def compute_pph21(gross, bpjs_total):
+    taxable = max(0.0, gross - bpjs_total - PPH21_PTKP_MONTHLY)
+    return round(taxable * PPH21_RATE, 2)
+
+
+def utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # --- Model Database ---
@@ -201,7 +274,7 @@ def run_scheduled_backup():
             if not settings or not settings.enabled:
                 return
 
-            now = datetime.utcnow()
+            now = utcnow()
             if settings.next_run_at and now < settings.next_run_at:
                 return
 
@@ -218,7 +291,7 @@ def run_scheduled_backup():
             db.session.rollback()
             settings = get_backup_settings(create_if_missing=False)
             if settings:
-                settings.last_run_at = datetime.utcnow()
+                settings.last_run_at = utcnow()
                 settings.last_status = "failed"
                 settings.last_error = str(exc)
                 settings.next_run_at = compute_next_run(settings.last_run_at, settings.interval_hours)
@@ -276,6 +349,7 @@ class Employee(db.Model):
 
     # ⬇⬇ Tambahkan baris ini ⬇⬇
     no_rek = db.Column(db.String(50), nullable=True)  # Nomor rekening karyawan
+    bank_name = db.Column(db.String(100), nullable=True)  # Nama bank
 
     hire_date = db.Column(db.Date, nullable=True)
     photo = db.Column(db.String(255), nullable=True)
@@ -288,6 +362,7 @@ class Payroll(db.Model):
     pay_period = db.Column(db.String(7), nullable=True)
     gaji_pokok = db.Column(db.Float, default=0)
     bpjs_ketenagakerjaan = db.Column(db.Float, default=0)
+    bpjs_kesehatan = db.Column(db.Float, default=0)
     tunjangan_makan = db.Column(db.Float, default=0)
     tunjangan_transport = db.Column(db.Float, default=0)
     tunjangan_lainnya = db.Column(db.Float, default=0)
@@ -296,19 +371,22 @@ class Payroll(db.Model):
     hutang = db.Column(db.Float, default=0)
     upah_lembur = db.Column(db.Float, default=0)
     thr = db.Column(db.Float, default=0)
+    pph21 = db.Column(db.Float, default=0)
     loan_deduction = db.Column(db.Float, default=0)  # Kolom baru untuk potongan pinjaman
     installments = db.relationship('PayrollLoan', backref='payroll', cascade='all, delete-orphan')
     employee = db.relationship('Employee', backref=db.backref('payrolls', lazy=True))
-    status = db.Column(db.String(20), default='draft')  # draft/approved
+    status = db.Column(db.String(20), default='draft')  # draft/submitted/approved/rejected
     approved_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     approved_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    submitted_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    reject_reason = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     @hybrid_property
     def take_home_pay(self):
         pendapatan = (
             self.gaji_pokok
-            + self.bpjs_ketenagakerjaan
             + self.tunjangan_makan
             + self.tunjangan_transport
             + self.tunjangan_lainnya
@@ -316,14 +394,21 @@ class Payroll(db.Model):
             + self.thr
         )
         potongan_alpha = self.alpha * (self.gaji_pokok / 30.0)
-        total_potongan = self.potongan_gaji + self.hutang + potongan_alpha + self.loan_deduction
+        total_potongan = (
+            self.potongan_gaji
+            + self.hutang
+            + potongan_alpha
+            + self.loan_deduction
+            + self.bpjs_ketenagakerjaan
+            + self.bpjs_kesehatan
+            + self.pph21
+        )
         return pendapatan - total_potongan
 
     @take_home_pay.expression
     def take_home_pay(cls):
         pendapatan = (
             cls.gaji_pokok
-            + cls.bpjs_ketenagakerjaan
             + cls.tunjangan_makan
             + cls.tunjangan_transport
             + cls.tunjangan_lainnya
@@ -331,19 +416,43 @@ class Payroll(db.Model):
             + cls.thr
         )
         potongan_alpha = cls.alpha * (cls.gaji_pokok / 30.0)
-        total_potongan = cls.potongan_gaji + cls.hutang + potongan_alpha + cls.loan_deduction
+        total_potongan = (
+            cls.potongan_gaji
+            + cls.hutang
+            + potongan_alpha
+            + cls.loan_deduction
+            + cls.bpjs_ketenagakerjaan
+            + cls.bpjs_kesehatan
+            + cls.pph21
+        )
         return pendapatan - total_potongan
     # ----- TOTAL POTONGAN UNTUK TABEL PAYROLL ----- 
     
     @hybrid_property
     def total_deductions(self):
             pot_alpha = self.alpha * (self.gaji_pokok / 30.0)
-            return self.potongan_gaji + self.hutang + pot_alpha + self.loan_deduction
+            return (
+                self.potongan_gaji
+                + self.hutang
+                + pot_alpha
+                + self.loan_deduction
+                + self.bpjs_ketenagakerjaan
+                + self.bpjs_kesehatan
+                + self.pph21
+            )
 
     @total_deductions.expression
     def total_deductions(cls):
             pot_alpha = cls.alpha * (cls.gaji_pokok / 30.0)
-            return cls.potongan_gaji + cls.hutang + pot_alpha + cls.loan_deduction
+            return (
+                cls.potongan_gaji
+                + cls.hutang
+                + pot_alpha
+                + cls.loan_deduction
+                + cls.bpjs_ketenagakerjaan
+                + cls.bpjs_kesehatan
+                + cls.pph21
+            )
 
     @hybrid_property
     def pay_period_date(self):
@@ -438,7 +547,7 @@ class CompensationComponent(db.Model):
     calc_type = db.Column(db.String(20), default='fixed')  # fixed / percentage
     default_value = db.Column(db.Float, default=0)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class EmployeeCompensation(db.Model):
@@ -460,7 +569,7 @@ class AuditLog(db.Model):
     entity_type = db.Column(db.String(100), nullable=False)
     entity_id = db.Column(db.Integer, nullable=False)
     details = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 # --- Helper audit ---
@@ -1054,7 +1163,7 @@ def backup_settings():
 
             if enabled:
                 if (not settings.next_run_at) or (not previous_enabled) or (previous_interval != interval_hours):
-                    settings.next_run_at = compute_next_run(datetime.utcnow(), interval_hours)
+                    settings.next_run_at = compute_next_run(utcnow(), interval_hours)
             else:
                 settings.next_run_at = None
 
@@ -1065,7 +1174,7 @@ def backup_settings():
         if action == 'run_now':
             try:
                 backup_path = export_database_json()
-                now = datetime.utcnow()
+                now = utcnow()
                 settings.last_run_at = now
                 settings.last_status = "success"
                 settings.last_error = None
@@ -1079,7 +1188,7 @@ def backup_settings():
                 db.session.rollback()
                 settings = get_backup_settings(create_if_missing=False)
                 if settings:
-                    settings.last_run_at = datetime.utcnow()
+                    settings.last_run_at = utcnow()
                     settings.last_status = "failed"
                     settings.last_error = str(exc)
                     settings.next_run_at = compute_next_run(settings.last_run_at, settings.interval_hours)
@@ -1150,6 +1259,99 @@ def admin_backup():
         return redirect(url_for('dashboard'))
 
     return send_file(backup_path, as_attachment=True, download_name=os.path.basename(backup_path))
+
+
+@app.route('/admin/server_status')
+def server_status():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Anda tidak memiliki hak akses.', 'danger')
+        return redirect(url_for('login'))
+
+    db_url = db.engine.url
+    backend = db_url.get_backend_name()
+    db_name = db_url.database or "-"
+    db_location = "-"
+    db_size_bytes = None
+    db_disk_usage = None
+    db_disk_note = None
+
+    if backend == "sqlite":
+        if db_name in (None, "", ":memory:"):
+            db_location = "in-memory"
+            db_name = "in-memory"
+            db_disk_note = "Tidak tersedia."
+        else:
+            db_path = db_name
+            if not os.path.isabs(db_path):
+                db_path = os.path.join(basedir, db_path)
+            db_location = db_path
+            db_name = os.path.basename(db_path)
+            if os.path.isfile(db_path):
+                db_size_bytes = os.path.getsize(db_path)
+            db_disk_usage = get_disk_usage(os.path.dirname(db_path))
+            if not db_disk_usage:
+                db_disk_note = "Tidak tersedia."
+    else:
+        host = db_url.host or "-"
+        port = f":{db_url.port}" if db_url.port else ""
+        db_location = f"{host}{port}" if host != "-" else "-"
+        if backend == "postgresql":
+            try:
+                db_size_bytes = db.session.execute(
+                    sa.text("SELECT pg_database_size(current_database())")
+                ).scalar()
+            except Exception:
+                db.session.rollback()
+        db_disk_note = "Postgres di Docker volume, disk usage tidak tersedia."
+
+    backup_dir = ensure_backup_dir()
+    backup_disk_usage = get_disk_usage(backup_dir)
+    connection_ok = True
+    connection_error = None
+    try:
+        db.session.execute(sa.text("SELECT 1"))
+    except Exception as exc:
+        db.session.rollback()
+        connection_ok = False
+        connection_error = str(exc)
+
+    settings = get_backup_settings(create_if_missing=True)
+    backup_files = list_backup_files(limit=None)
+    backup_count = len(backup_files)
+    backup_total_bytes = sum(item["size"] for item in backup_files)
+    last_backup = backup_files[0] if backup_files else None
+    total_users = User.query.count()
+    total_employees = Employee.query.count()
+    total_payrolls = Payroll.query.count()
+
+    return render_template(
+        'server_status.html',
+        db_backend=backend,
+        db_name=db_name,
+        db_location=db_location,
+        db_size=format_bytes(db_size_bytes),
+        db_uri=db_url.render_as_string(hide_password=True),
+        connection_ok=connection_ok,
+        connection_error=connection_error,
+        backup_settings=settings,
+        backup_count=backup_count,
+        backup_total_size=format_bytes(backup_total_bytes),
+        backup_last_file=last_backup["name"] if last_backup else None,
+        backup_last_mtime=last_backup["mtime"] if last_backup else None,
+        backup_dir=backup_dir,
+        db_disk_usage=db_disk_usage,
+        db_disk_note=db_disk_note,
+        backup_disk_usage=backup_disk_usage,
+        total_users=total_users,
+        total_employees=total_employees,
+        total_payrolls=total_payrolls,
+        server_time=datetime.now(),
+        server_time_utc=utcnow(),
+        python_version=platform.python_version(),
+        flask_version=flask.__version__,
+        system_info=platform.platform(),
+        app_root=basedir,
+    )
 
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
 def edit_user(user_id):
@@ -1440,6 +1642,7 @@ def add_employee():
     address = request.form.get('address')
     phone = request.form.get('phone')
     no_rek = request.form.get('no_rek')  # <-- baru
+    bank_name = request.form.get('bank_name')
     hire_date_str = request.form.get('hire_date')  # "2025-03-10" (YYYY-MM-DD)
 
     # 1) Dapatkan ID terakhir, siapkan auto increment
@@ -1469,6 +1672,7 @@ def add_employee():
         address=address,
         phone=phone,
         no_rek=no_rek,          # <-- baru
+        bank_name=bank_name,
         hire_date=parsed_hire_date
     )
     
@@ -1476,6 +1680,163 @@ def add_employee():
     db.session.commit()
     
     flash('Karyawan baru berhasil ditambahkan.', 'success')
+    return redirect(url_for('employees'))
+
+
+@app.route('/employees/import', methods=['POST'])
+def import_employees():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Tidak memiliki akses.', 'danger')
+        return redirect(url_for('login'))
+
+    upload = request.files.get('file')
+    if not upload or not upload.filename:
+        flash('File import wajib diunggah.', 'warning')
+        return redirect(url_for('employees'))
+
+    _, ext = os.path.splitext(upload.filename)
+    ext = ext.lower()
+    if ext not in ('.xlsx', '.xls', '.csv'):
+        flash('Format file tidak didukung. Gunakan .xlsx, .xls, atau .csv.', 'danger')
+        return redirect(url_for('employees'))
+
+    try:
+        if ext == '.csv':
+            df = pd.read_csv(upload)
+        else:
+            df = pd.read_excel(upload)
+    except Exception as exc:
+        flash(f'Gagal membaca file: {exc}', 'danger')
+        return redirect(url_for('employees'))
+
+    if df.empty:
+        flash('File import kosong.', 'warning')
+        return redirect(url_for('employees'))
+
+    def normalize_col(name):
+        return str(name).strip().lower()
+
+    df.columns = [normalize_col(c) for c in df.columns]
+    col_map = {
+        'nik': 'nik',
+        'nama': 'name',
+        'karyawan': 'name',
+        'jabatan': 'position',
+        'posisi': 'position',
+        'alamat': 'address',
+        'telepon': 'phone',
+        'telp': 'phone',
+        'no hp': 'phone',
+        'no. hp': 'phone',
+        'phone': 'phone',
+        'no rek': 'no_rek',
+        'no. rek': 'no_rek',
+        'no rekening': 'no_rek',
+        'no. rekening': 'no_rek',
+        'rekening': 'no_rek',
+        'nama bank': 'bank_name',
+        'bank': 'bank_name',
+        'tanggal masuk': 'hire_date',
+        'tgl masuk': 'hire_date',
+        'tgl. masuk': 'hire_date',
+        'hire date': 'hire_date',
+    }
+    rename_cols = {col: col_map[col] for col in df.columns if col in col_map}
+    df = df.rename(columns=rename_cols)
+
+    def clean_str(value):
+        if value is None:
+            return ""
+        if isinstance(value, float):
+            if pd.isna(value):
+                return ""
+            if value.is_integer():
+                value = int(value)
+        text = str(value).strip()
+        return "" if text.lower() == "nan" else text
+
+    def parse_date_value(value):
+        if value is None:
+            return None
+        if isinstance(value, float) and pd.isna(value):
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        parsed = pd.to_datetime(value, errors='coerce')
+        if pd.isna(parsed):
+            return None
+        return parsed.date()
+
+    update_existing = request.form.get('update_existing') == 'on'
+    max_id = db.session.query(sa.func.max(Employee.id)).scalar() or 0
+    next_id = max_id + 1
+
+    created = 0
+    updated = 0
+    skipped = 0
+
+    try:
+        for _, row in df.iterrows():
+            name = clean_str(row.get('name'))
+            nik = clean_str(row.get('nik'))
+            if not name:
+                skipped += 1
+                continue
+
+            if not nik:
+                nik = f"EMP{next_id:04d}"
+                next_id += 1
+
+            emp = Employee.query.filter_by(nik=nik).first()
+            if emp:
+                if not update_existing:
+                    skipped += 1
+                    continue
+                position = clean_str(row.get('position'))
+                address = clean_str(row.get('address'))
+                phone = clean_str(row.get('phone'))
+                no_rek = clean_str(row.get('no_rek'))
+                bank_name = clean_str(row.get('bank_name'))
+                hire_date = parse_date_value(row.get('hire_date'))
+
+                emp.name = name
+                if position:
+                    emp.position = position
+                if address:
+                    emp.address = address
+                if phone:
+                    emp.phone = phone
+                if no_rek:
+                    emp.no_rek = no_rek
+                if bank_name:
+                    emp.bank_name = bank_name
+                if hire_date:
+                    emp.hire_date = hire_date
+                updated += 1
+                continue
+
+            emp = Employee(
+                nik=nik,
+                name=name,
+                position=clean_str(row.get('position')) or None,
+                address=clean_str(row.get('address')) or None,
+                phone=clean_str(row.get('phone')) or None,
+                no_rek=clean_str(row.get('no_rek')) or None,
+                bank_name=clean_str(row.get('bank_name')) or None,
+                hire_date=parse_date_value(row.get('hire_date')),
+            )
+            db.session.add(emp)
+            created += 1
+
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'Gagal import data: {exc}', 'danger')
+        return redirect(url_for('employees'))
+
+    flash(f'Import selesai. Dibuat: {created}, diperbarui: {updated}, dilewati: {skipped}.', 'success')
     return redirect(url_for('employees'))
 
 
@@ -1502,7 +1863,9 @@ def payrolls():
     if pay_month:
         query = query.filter(Payroll.pay_period == pay_month)
 
-    draft_count = query.filter(Payroll.status != 'approved').count()
+    draft_count = query.filter(Payroll.status == 'draft').count()
+    submitted_count = query.filter(Payroll.status == 'submitted').count()
+    rejected_count = query.filter(Payroll.status == 'rejected').count()
 
     pagination   = query.order_by(Payroll.id.desc()).paginate(
                        page=page, per_page=per_page, error_out=False)
@@ -1512,7 +1875,9 @@ def payrolls():
                            payrolls   = payrolls_pag,
                            pagination = pagination,
                            per_page   = per_page,
-                           draft_count = draft_count)
+                           draft_count = draft_count,
+                           submitted_count = submitted_count,
+                           rejected_count = rejected_count)
 
 
 
@@ -1529,8 +1894,7 @@ def add_payroll():
 
     # ============================= POST (submit form) =========================
     if request.method == 'POST':
-        # helper rupiah → float
-        parse_currency = lambda v: float((v or '0').replace('.', ''))
+        auto_calc = request.form.get('auto_calc') == 'on'
 
         # nilai form dasar
         employee_id  = int(request.form['employee_id'])
@@ -1539,6 +1903,8 @@ def add_payroll():
 
         gaji_pokok           = parse_currency(request.form.get('gaji_pokok'))
         bpjs_ketenagakerjaan = parse_currency(request.form.get('bpjs_ketenagakerjaan'))
+        bpjs_kesehatan       = parse_currency(request.form.get('bpjs_kesehatan'))
+        pph21                = parse_currency(request.form.get('pph21'))
         tunjangan_makan      = parse_currency(request.form.get('tunjangan_makan'))
         tunjangan_transport  = parse_currency(request.form.get('tunjangan_transport'))
         tunjangan_lainnya    = parse_currency(request.form.get('tunjangan_lainnya'))
@@ -1552,6 +1918,19 @@ def add_payroll():
         if request.form.get('is_thr') == 'on' and emp and end_date:
             months = months_of_service(emp.hire_date, end_date)
             thr_value = gaji_pokok if months >= 12 else (months / 12.0) * gaji_pokok
+
+        gross_income = (
+            gaji_pokok
+            + tunjangan_makan
+            + tunjangan_transport
+            + tunjangan_lainnya
+            + upah_lembur
+            + thr_value
+        )
+        if auto_calc:
+            bpjs_ketenagakerjaan = compute_bpjs_ketenagakerjaan(gaji_pokok)
+            bpjs_kesehatan = compute_bpjs_kesehatan(gaji_pokok)
+            pph21 = compute_pph21(gross_income, bpjs_ketenagakerjaan + bpjs_kesehatan)
 
         # -------- proses pembayaran (angsuran) yang dipilih --------
         selected_payments = request.form.getlist('payments')            # ["12", "18", ...]
@@ -1589,6 +1968,7 @@ def add_payroll():
             pay_period           = pay_period,
             gaji_pokok           = gaji_pokok,
             bpjs_ketenagakerjaan = bpjs_ketenagakerjaan,
+            bpjs_kesehatan       = bpjs_kesehatan,
             tunjangan_makan      = tunjangan_makan,
             tunjangan_transport  = tunjangan_transport,
             tunjangan_lainnya    = tunjangan_lainnya,
@@ -1597,6 +1977,7 @@ def add_payroll():
             hutang               = total_hutang,        # total cicilan dipilih
             upah_lembur          = upah_lembur,
             thr                  = thr_value,
+            pph21                = pph21,
             loan_deduction       = 0,                   # sudah tidak dipakai
             status               = 'draft'
         )
@@ -1654,8 +2035,8 @@ def edit_payroll(payroll_id):
     
     payroll = Payroll.query.get_or_404(payroll_id)
 
-    if payroll.status == 'approved':
-        flash('Payroll yang sudah disetujui/terkunci tidak dapat diedit.', 'warning')
+    if payroll.status != 'draft':
+        flash('Payroll yang sudah diajukan/terkunci tidak dapat diedit.', 'warning')
         return redirect(url_for('payslip', payroll_id=payroll.id))
     
     if request.method == 'GET':
@@ -1679,10 +2060,8 @@ def edit_payroll(payroll_id):
     # Konversi pay_period -> end_date
     end_date = parse_period_to_date(pay_period)  # date(2025, 3, 1) atau None
 
-    # Bersihkan format rp -> hilangkan titik sebelum float()
-    gaji_pokok_str = request.form.get('gaji_pokok') or '0'
-    gaji_pokok_str = gaji_pokok_str.replace('.', '')
-    gaji_pokok = float(gaji_pokok_str)
+    auto_calc = request.form.get('auto_calc') == 'on'
+    gaji_pokok = parse_currency(request.form.get('gaji_pokok'))
     
     # Ambil data karyawan
     emp = Employee.query.get(employee_id)
@@ -1705,33 +2084,24 @@ def edit_payroll(payroll_id):
     payroll.thr = thr_value  # simpan hasil THR
 
     # BPJS
-    bpjs_str = request.form.get('bpjs_ketenagakerjaan') or '0'
-    bpjs_str = bpjs_str.replace('.', '')
-    bpjs_ketenagakerjaan = float(bpjs_str)
-    payroll.bpjs_ketenagakerjaan = bpjs_ketenagakerjaan
+    bpjs_ketenagakerjaan = parse_currency(request.form.get('bpjs_ketenagakerjaan'))
+    bpjs_kesehatan = parse_currency(request.form.get('bpjs_kesehatan'))
+    pph21 = parse_currency(request.form.get('pph21'))
 
     # Tunjangan makan
-    tunj_makan_str = request.form.get('tunjangan_makan') or '0'
-    tunj_makan_str = tunj_makan_str.replace('.', '')
-    tunjangan_makan = float(tunj_makan_str)
+    tunjangan_makan = parse_currency(request.form.get('tunjangan_makan'))
     payroll.tunjangan_makan = tunjangan_makan
 
     # Tunjangan transport
-    tunj_transport_str = request.form.get('tunjangan_transport') or '0'
-    tunj_transport_str = tunj_transport_str.replace('.', '')
-    tunjangan_transport = float(tunj_transport_str)
+    tunjangan_transport = parse_currency(request.form.get('tunjangan_transport'))
     payroll.tunjangan_transport = tunjangan_transport
 
     # Tunjangan lainnya
-    tunj_lain_str = request.form.get('tunjangan_lainnya') or '0'
-    tunj_lain_str = tunj_lain_str.replace('.', '')
-    tunjangan_lainnya = float(tunj_lain_str)
+    tunjangan_lainnya = parse_currency(request.form.get('tunjangan_lainnya'))
     payroll.tunjangan_lainnya = tunjangan_lainnya
 
     # Potongan gaji
-    pot_gaji_str = request.form.get('potongan_gaji') or '0'
-    pot_gaji_str = pot_gaji_str.replace('.', '')
-    potongan_gaji = float(pot_gaji_str)
+    potongan_gaji = parse_currency(request.form.get('potongan_gaji'))
     payroll.potongan_gaji = potongan_gaji
 
     # Alpha
@@ -1739,10 +2109,25 @@ def edit_payroll(payroll_id):
     payroll.alpha = alpha
 
     # Upah lembur
-    lembur_str = request.form.get('upah_lembur') or '0'
-    lembur_str = lembur_str.replace('.', '')
-    upah_lembur = float(lembur_str)
+    upah_lembur = parse_currency(request.form.get('upah_lembur'))
     payroll.upah_lembur = upah_lembur
+
+    gross_income = (
+        gaji_pokok
+        + tunjangan_makan
+        + tunjangan_transport
+        + tunjangan_lainnya
+        + upah_lembur
+        + thr_value
+    )
+    if auto_calc:
+        bpjs_ketenagakerjaan = compute_bpjs_ketenagakerjaan(gaji_pokok)
+        bpjs_kesehatan = compute_bpjs_kesehatan(gaji_pokok)
+        pph21 = compute_pph21(gross_income, bpjs_ketenagakerjaan + bpjs_kesehatan)
+
+    payroll.bpjs_ketenagakerjaan = bpjs_ketenagakerjaan
+    payroll.bpjs_kesehatan = bpjs_kesehatan
+    payroll.pph21 = pph21
 
     db.session.commit()
     log_action('update_payroll', 'payroll', payroll.id, f'periode={pay_period}')
@@ -1759,8 +2144,8 @@ def delete_payroll(payroll_id):
 
     payroll = Payroll.query.get_or_404(payroll_id)
 
-    if payroll.status == 'approved':
-        flash('Payroll yang sudah disetujui/terkunci tidak dapat dihapus.', 'warning')
+    if payroll.status != 'draft':
+        flash('Payroll yang sudah diajukan/terkunci tidak dapat dihapus.', 'warning')
         return redirect(url_for('payrolls'))
 
     # --- kembalikan status tiap angsuran ---
@@ -1801,6 +2186,7 @@ def edit_employee(employee_id):
     emp.phone = request.form.get('phone')
     emp.address = request.form.get('address')
     emp.no_rek = request.form.get('no_rek')  # <-- baru
+    emp.bank_name = request.form.get('bank_name')
 
     hire_date_str = request.form.get('hire_date')
     if hire_date_str:
@@ -1862,6 +2248,76 @@ def payslip(payroll_id):
 
     return render_template('payslip.html', payroll=payroll)
 
+@app.route('/payrolls/<int:payroll_id>/submit', methods=['POST'])
+def submit_payroll(payroll_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Tidak memiliki akses.', 'danger')
+        return redirect(url_for('login'))
+
+    payroll = Payroll.query.get_or_404(payroll_id)
+    if payroll.status == 'approved':
+        flash('Payroll sudah disetujui.', 'info')
+        return redirect(url_for('payrolls'))
+    if payroll.status == 'submitted':
+        flash('Payroll sudah diajukan.', 'info')
+        return redirect(url_for('payrolls'))
+    if payroll.status != 'draft':
+        flash('Payroll harus dikembalikan ke draft sebelum diajukan.', 'warning')
+        return redirect(url_for('payrolls'))
+
+    payroll.status = 'submitted'
+    payroll.submitted_by = session.get('user_id')
+    payroll.submitted_at = datetime.now(timezone.utc)
+    payroll.reject_reason = None
+    db.session.commit()
+    log_action('submit_payroll', 'payroll', payroll.id, f'submitted_by={payroll.submitted_by}')
+    flash('Payroll berhasil diajukan untuk persetujuan.', 'success')
+    return redirect(url_for('payrolls'))
+
+@app.route('/payrolls/<int:payroll_id>/reject', methods=['POST'])
+def reject_payroll(payroll_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Tidak memiliki akses.', 'danger')
+        return redirect(url_for('login'))
+
+    payroll = Payroll.query.get_or_404(payroll_id)
+    if payroll.status != 'submitted':
+        flash('Payroll hanya bisa ditolak saat status menunggu.', 'warning')
+        return redirect(url_for('payrolls'))
+
+    reason = (request.form.get('reject_reason') or '').strip()
+    if not reason:
+        flash('Alasan penolakan wajib diisi.', 'warning')
+        return redirect(url_for('payrolls'))
+
+    payroll.status = 'rejected'
+    payroll.reject_reason = reason
+    db.session.commit()
+    log_action('reject_payroll', 'payroll', payroll.id, f'reason={reason}')
+    flash('Payroll ditolak.', 'warning')
+    return redirect(url_for('payrolls'))
+
+
+@app.route('/payrolls/<int:payroll_id>/revert', methods=['POST'])
+def revert_payroll(payroll_id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        flash('Tidak memiliki akses.', 'danger')
+        return redirect(url_for('login'))
+
+    payroll = Payroll.query.get_or_404(payroll_id)
+    if payroll.status not in ('submitted', 'rejected'):
+        flash('Payroll tidak dapat dikembalikan ke draft.', 'warning')
+        return redirect(url_for('payrolls'))
+
+    payroll.status = 'draft'
+    payroll.submitted_by = None
+    payroll.submitted_at = None
+    payroll.reject_reason = None
+    db.session.commit()
+    log_action('revert_payroll', 'payroll', payroll.id, 'reverted_to_draft')
+    flash('Payroll dikembalikan ke draft.', 'success')
+    return redirect(url_for('payrolls'))
+
 @app.route('/payrolls/<int:payroll_id>/approve', methods=['POST'])
 def approve_payroll(payroll_id):
     if 'user_id' not in session or session.get('role') != 'admin':
@@ -1871,6 +2327,9 @@ def approve_payroll(payroll_id):
     payroll = Payroll.query.get_or_404(payroll_id)
     if payroll.status == 'approved':
         flash('Payroll sudah disetujui.', 'info')
+        return redirect(url_for('payrolls'))
+    if payroll.status != 'submitted':
+        flash('Payroll harus diajukan terlebih dahulu.', 'warning')
         return redirect(url_for('payrolls'))
 
     payroll.status = 'approved'
@@ -1893,8 +2352,8 @@ def bulk_approve_payrolls():
         flash('Tidak ada payroll yang dipilih.', 'warning')
         return redirect(url_for('payrolls'))
 
-    # hanya approve yang masih draft
-    to_approve = Payroll.query.filter(Payroll.id.in_(ids), Payroll.status != 'approved').all()
+    # hanya approve yang sudah diajukan
+    to_approve = Payroll.query.filter(Payroll.id.in_(ids), Payroll.status == 'submitted').all()
     for p in to_approve:
         p.status = 'approved'
         p.approved_by = session.get('user_id')
@@ -1932,10 +2391,12 @@ def export_payrolls(file_format):
         'Periode'               : p.pay_period,
         'Gaji Pokok'            : p.gaji_pokok,
         'BPJS Ketenagakerjaan'  : p.bpjs_ketenagakerjaan,
+        'BPJS Kesehatan'        : p.bpjs_kesehatan,
         'Tunjangan Makan'       : p.tunjangan_makan,
         'Tunjangan Transport'   : p.tunjangan_transport,
         'Tunjangan Lainnya'     : p.tunjangan_lainnya,
         'THR'                   : p.thr,
+        'PPH21'                 : p.pph21,
         'Potongan Gaji'         : p.potongan_gaji,
         'Alpha'                 : p.alpha,
         'Total Potongan'        : p.total_deductions,
@@ -1990,7 +2451,7 @@ def compliance_report():
     payrolls = Payroll.query.join(Employee).filter(Payroll.pay_period == pay_period).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Karyawan', 'NIK', 'Periode', 'Gaji Pokok', 'BPJS', 'Tunjangan', 'Potongan', 'THP'])
+    writer.writerow(['Karyawan', 'NIK', 'Periode', 'Gaji Pokok', 'BPJS TK', 'BPJS KS', 'PPH21', 'Tunjangan', 'Potongan', 'THP'])
     for p in payrolls:
         tunj = (p.tunjangan_makan + p.tunjangan_transport + p.tunjangan_lainnya + p.thr + p.upah_lembur)
         pot = p.total_deductions
@@ -2000,6 +2461,8 @@ def compliance_report():
             p.pay_period,
             int(p.gaji_pokok or 0),
             int(p.bpjs_ketenagakerjaan or 0),
+            int(p.bpjs_kesehatan or 0),
+            int(p.pph21 or 0),
             int(tunj),
             int(pot),
             int(p.take_home_pay or 0)
@@ -2017,20 +2480,41 @@ def bank_export():
         return redirect(url_for('login'))
 
     pay_period = request.args.get('pay_period', '').strip()
+    file_format = request.args.get('file_format', 'csv').lower()
     if not pay_period:
         flash('Periode wajib diisi untuk ekspor bank.', 'warning')
         return redirect(url_for('payrolls'))
 
     payrolls = Payroll.query.join(Employee).filter(Payroll.pay_period == pay_period).all()
+    data = [{
+        'Nama': p.employee.name,
+        'NIK': p.employee.nik,
+        'Nama Bank': p.employee.bank_name or '',
+        'No Rekening': p.employee.no_rek or '',
+        'Jumlah Transfer': int(p.take_home_pay or 0),
+    } for p in payrolls]
+
+    if file_format == 'excel':
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Bank Export')
+        output.seek(0)
+        resp = make_response(output.read())
+        resp.headers['Content-Disposition'] = f'attachment; filename=bank_export_{pay_period}.xlsx'
+        resp.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        return resp
+
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Nama', 'NIK', 'No Rekening', 'Jumlah Transfer'])
-    for p in payrolls:
+    writer.writerow(['Nama', 'NIK', 'Nama Bank', 'No Rekening', 'Jumlah Transfer'])
+    for row in data:
         writer.writerow([
-            p.employee.name,
-            p.employee.nik,
-            p.employee.no_rek or '',
-            int(p.take_home_pay or 0)
+            row['Nama'],
+            row['NIK'],
+            row['Nama Bank'],
+            row['No Rekening'],
+            row['Jumlah Transfer'],
         ])
     resp = make_response(output.getvalue())
     resp.headers['Content-Disposition'] = f'attachment; filename=bank_export_{pay_period}.csv'
@@ -2056,6 +2540,7 @@ def export_employees(file_format):
             'Alamat': emp.address,
             'Telepon': emp.phone,
             'No. Rekening'  : emp.no_rek,  # <-- baru
+            'Nama Bank'     : emp.bank_name,
             'Tanggal Masuk': emp.hire_date.strftime("%d/%m/%Y") if emp.hire_date else ''
         })
     

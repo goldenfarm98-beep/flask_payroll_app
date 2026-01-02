@@ -90,7 +90,7 @@ def test_loan_remaining_and_audit_log(app_instance):
         db.session.add(payment)
         db.session.commit()
 
-        reloaded = Loan.query.get(loan.id)
+        reloaded = db.session.get(Loan, loan.id)
         assert reloaded.remaining == 1_000_000
 
     with app_instance.test_request_context():

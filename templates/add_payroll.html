@@ -43,6 +43,11 @@
   </div>
 
   <div class="mb-3 form-check">
+    <input type="checkbox" name="auto_calc" id="auto_calc" class="form-check-input" checked>
+    <label for="auto_calc" class="form-check-label">Hitung otomatis PPH21 & BPJS</label>
+  </div>
+
+  <div class="mb-3 form-check">
     <input type="checkbox" name="is_thr" id="is_thr" class="form-check-input">
     <label for="is_thr" class="form-check-label">Bulan THR?</label>
     <small class="text-muted">(Jika dicentang, THR = gaji pokok.)</small>
@@ -81,7 +86,7 @@
       </div>
     </div>
     <div class="col-md-4">
-      <label class="form-label">BPJS Ketenagakerjaan</label>
+      <label class="form-label">BPJS Ketenagakerjaan (Potongan)</label>
       <div class="input-group">
         <span class="input-group-text">Rp.</span>
         <input type="text" name="bpjs_ketenagakerjaan" class="form-control rupiah" placeholder="0">
@@ -90,6 +95,23 @@
     <div class="col-md-4">
       <label class="form-label">Alpha (hari)</label>
       <input type="number" name="alpha" class="form-control" step="1">
+    </div>
+  </div>
+
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">BPJS Kesehatan (Potongan)</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="bpjs_kesehatan" class="form-control rupiah" placeholder="0">
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">PPH21 (Potongan)</label>
+      <div class="input-group">
+        <span class="input-group-text">Rp.</span>
+        <input type="text" name="pph21" class="form-control rupiah" placeholder="0">
+      </div>
     </div>
   </div>
 

@@ -27,6 +27,7 @@
           <th>Posisi</th>
           <th class="nowrap">No. HP</th>
           <th class="nowrap">No. Rek</th>
+          <th>Nama Bank</th>
           <th>Alamat</th>
           <th class="nowrap">Tgl Masuk</th>
           <th>Payroll Pernah Diterima</th>
@@ -43,6 +44,7 @@
           <td>{{ emp.position }}</td>
           <td class="nowrap">{{ emp.phone }}</td>
           <td class="nowrap">{{ emp.no_rek or '-' }}</td>
+          <td>{{ emp.bank_name or '-' }}</td>
           <td>{{ emp.address }}</td>
           <td class="nowrap">
             {% if emp.hire_date %}{{ emp.hire_date|strftime('%d/%m/%Y') }}{% else %}-{% endif %}
@@ -65,7 +67,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="10" class="text-center">Tidak ada karyawan di arsip.</td>
+          <td colspan="12" class="text-center">Tidak ada karyawan di arsip.</td>
         </tr>
         {% endfor %}
       </tbody>

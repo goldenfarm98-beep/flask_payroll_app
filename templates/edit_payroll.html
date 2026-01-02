@@ -21,6 +21,11 @@
     <input type="month" id="pay_period" name="pay_period" class="form-control" value="{{ payroll.pay_period }}">
   </div>
 
+  <div class="mb-3 form-check">
+    <input type="checkbox" name="auto_calc" id="auto_calc" class="form-check-input" checked>
+    <label for="auto_calc" class="form-check-label">Hitung otomatis PPH21 & BPJS</label>
+  </div>
+
   <!-- Baris 1 -->
   <div class="row mb-2">
     <div class="col-md-4">
@@ -29,13 +34,26 @@
 
     </div>
     <div class="col-md-4">
-      <label class="form-label">BPJS Ketenagakerjaan</label>
+      <label class="form-label">BPJS Ketenagakerjaan (Potongan)</label>
       <input type="text" name="bpjs_ketenagakerjaan" class="form-control rupiah"
         value="{{ payroll.bpjs_ketenagakerjaan|rupiah }}">
     </div>
     <div class="col-md-4">
       <label class="form-label">Alpha (hari)</label>
       <input type="number" name="alpha" class="form-control" step="1" value="{{ payroll.alpha }}">
+    </div>
+  </div>
+
+  <div class="row mb-2">
+    <div class="col-md-4">
+      <label class="form-label">BPJS Kesehatan (Potongan)</label>
+      <input type="text" name="bpjs_kesehatan" class="form-control rupiah"
+        value="{{ payroll.bpjs_kesehatan|rupiah }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">PPH21 (Potongan)</label>
+      <input type="text" name="pph21" class="form-control rupiah"
+        value="{{ payroll.pph21|rupiah }}">
     </div>
   </div>
 

@@ -45,7 +45,17 @@
   <div class="d-flex align-items-center gap-2">
     {% if draft_count is defined %}
       <span class="badge bg-warning text-dark">
-        Belum disetujui: {{ draft_count }}
+        Draft: {{ draft_count }}
+      </span>
+    {% endif %}
+    {% if submitted_count is defined %}
+      <span class="badge bg-info text-dark">
+        Menunggu: {{ submitted_count }}
+      </span>
+    {% endif %}
+    {% if rejected_count is defined %}
+      <span class="badge bg-danger">
+        Ditolak: {{ rejected_count }}
       </span>
     {% endif %}
   </div>
@@ -83,8 +93,12 @@
           <i class="fa fa-shield me-2"></i>CSV Laporan Kepatuhan
         </a>
         <a class="dropdown-item"
-           href="{{ url_for('bank_export', pay_period=per or request.args.get('pay_period','')) }}">
+           href="{{ url_for('bank_export', pay_period=per or request.args.get('pay_period',''), file_format='csv') }}">
           <i class="fa fa-university me-2"></i>CSV Ekspor Bank
+        </a>
+        <a class="dropdown-item"
+           href="{{ url_for('bank_export', pay_period=per or request.args.get('pay_period',''), file_format='excel') }}">
+          <i class="fa fa-file-excel-o me-2"></i>Excel Ekspor Bank
         </a>
       </div>
     </div>
@@ -166,12 +180,14 @@
           <th class="nowrap text-center">Status</th>
           <th class="text-money">Gaji Pokok</th>
           <th class="text-money">BPJS Ketenagakerjaan</th>
+          <th class="text-money">BPJS Kesehatan</th>
           <th class="text-money">Tunj. Makan</th>
           <th class="text-money">Tunj. Transport</th>
           <th class="text-money">Tunj. Lainnya</th>
           <th class="text-money">THR</th>
           <th class="text-center">Alpha</th>
           <th class="text-money">Upah Lembur</th>
+          <th class="text-money">PPH21</th>
           <th class="text-money">Pot. Gaji</th>
           <th class="text-money">Pot. Hutang</th>
           <th class="text-money">Total Potongan</th>
@@ -183,7 +199,7 @@
         {% for payroll in payrolls %}
         <tr>
           <td class="text-center">
-            {% if payroll.status != 'approved' %}
+            {% if payroll.status == 'submitted' %}
               <input type="checkbox" name="payroll_ids" form="bulk-approve-form" value="{{ payroll.id }}" class="row-check">
             {% endif %}
           </td>
@@ -193,6 +209,13 @@
           <td class="text-center">
             {% if payroll.status == 'approved' %}
               <span class="badge bg-success">Approved</span>
+            {% elif payroll.status == 'submitted' %}
+              <span class="badge bg-info text-dark">Menunggu</span>
+            {% elif payroll.status == 'rejected' %}
+              <span class="badge bg-danger">Ditolak</span>
+              {% if payroll.reject_reason %}
+                <div class="small text-muted mt-1">Alasan: {{ payroll.reject_reason }}</div>
+              {% endif %}
             {% else %}
               <span class="badge bg-warning text-dark">Draft</span>
             {% endif %}
@@ -200,6 +223,7 @@
 
           <td class="text-money">Rp. {{ payroll.gaji_pokok|rupiah }}</td>
           <td class="text-money">Rp. {{ payroll.bpjs_ketenagakerjaan|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.bpjs_kesehatan|rupiah }}</td>
           <td class="text-money">Rp. {{ payroll.tunjangan_makan|rupiah }}</td>
           <td class="text-money">Rp. {{ payroll.tunjangan_transport|rupiah }}</td>
           <td class="text-money">Rp. {{ payroll.tunjangan_lainnya|rupiah }}</td>
@@ -212,9 +236,10 @@
           </td>
 
           <td class="text-money">Rp. {{ payroll.upah_lembur|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.pph21|rupiah }}</td>
           <td class="text-money">Rp. {{ payroll.potongan_gaji|rupiah }}</td>
           <td class="text-money">Rp. {{ payroll.hutang|rupiah }}</td>
-          <td class="text-money">Rp. {{ (payroll.potongan_gaji + payroll.hutang)|rupiah }}</td>
+          <td class="text-money">Rp. {{ payroll.total_deductions|rupiah }}</td>
 
           <td class="text-money thp text-success">Rp. {{ payroll.take_home_pay|rupiah }}</td>
 
@@ -226,7 +251,7 @@
               <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown"></button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
-                  {% if payroll.status != 'approved' %}
+                  {% if payroll.status == 'draft' %}
                     <a class="dropdown-item" href="{{ url_for('edit_payroll', payroll_id=payroll.id) }}">
                       <i class="fa fa-edit me-2"></i>Edit
                     </a>
@@ -234,7 +259,18 @@
                     <span class="dropdown-item text-muted"><i class="fa fa-lock me-2"></i>Terkunci</span>
                   {% endif %}
                 </li>
-                {% if payroll.status != 'approved' %}
+                {% if payroll.status == 'draft' %}
+                <li>
+                  <form action="{{ url_for('submit_payroll', payroll_id=payroll.id) }}"
+                        method="post"
+                        onsubmit="return confirm('Ajukan payroll ini untuk persetujuan?');">
+                    <button class="dropdown-item text-primary">
+                      <i class="fa fa-paper-plane me-2"></i>Ajukan
+                    </button>
+                  </form>
+                </li>
+                {% endif %}
+                {% if payroll.status == 'submitted' %}
                 <li>
                   <form action="{{ url_for('approve_payroll', payroll_id=payroll.id) }}"
                         method="post"
@@ -244,9 +280,40 @@
                     </button>
                   </form>
                 </li>
+                <li>
+                  <form id="reject-form-{{ payroll.id }}"
+                        action="{{ url_for('reject_payroll', payroll_id=payroll.id) }}"
+                        method="post">
+                    <input type="hidden" name="reject_reason">
+                    <button type="button" class="dropdown-item text-danger"
+                            onclick="openRejectModal('{{ payroll.id }}')">
+                      <i class="fa fa-times me-2"></i>Tolak
+                    </button>
+                  </form>
+                </li>
+                <li>
+                  <form action="{{ url_for('revert_payroll', payroll_id=payroll.id) }}"
+                        method="post"
+                        onsubmit="return confirm('Kembalikan payroll ini ke draft?');">
+                    <button class="dropdown-item">
+                      <i class="fa fa-undo me-2"></i>Kembalikan ke Draft
+                    </button>
+                  </form>
+                </li>
+                {% endif %}
+                {% if payroll.status == 'rejected' %}
+                <li>
+                  <form action="{{ url_for('revert_payroll', payroll_id=payroll.id) }}"
+                        method="post"
+                        onsubmit="return confirm('Kembalikan payroll ini ke draft?');">
+                    <button class="dropdown-item">
+                      <i class="fa fa-undo me-2"></i>Kembalikan ke Draft
+                    </button>
+                  </form>
+                </li>
                 {% endif %}
                 <li>
-                  {% if payroll.status != 'approved' %}
+                  {% if payroll.status == 'draft' %}
                     <a class="dropdown-item text-danger"
                        href="{{ url_for('delete_payroll', payroll_id=payroll.id) }}"
                        onclick="return confirm('Yakin ingin menghapus data payroll ini?')">
@@ -276,7 +343,66 @@
       });
     }
   });
+  let rejectTargetFormId = null;
+  let rejectModal = null;
+
+  function openRejectModal(payrollId) {
+    rejectTargetFormId = `reject-form-${payrollId}`;
+    const textarea = document.getElementById('rejectReasonInput');
+    if (textarea) {
+      textarea.value = '';
+    }
+    const modalEl = document.getElementById('rejectModal');
+    if (!modalEl || !window.bootstrap) {
+      return;
+    }
+    if (!rejectModal) {
+      rejectModal = new bootstrap.Modal(modalEl);
+    }
+    rejectModal.show();
+  }
+
+  function submitRejectReason() {
+    if (!rejectTargetFormId) {
+      return;
+    }
+    const textarea = document.getElementById('rejectReasonInput');
+    const reason = textarea ? textarea.value.trim() : '';
+    if (!reason) {
+      window.alert('Alasan penolakan wajib diisi.');
+      return;
+    }
+    const form = document.getElementById(rejectTargetFormId);
+    if (!form) {
+      return;
+    }
+    const input = form.querySelector('input[name="reject_reason"]');
+    if (input) {
+      input.value = reason;
+    }
+    form.submit();
+  }
 </script>
+
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Tolak Payroll</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="rejectReasonInput" class="form-label">Alasan penolakan</label>
+        <textarea id="rejectReasonInput" class="form-control" rows="4"
+                  placeholder="Contoh: data lembur belum lengkap."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-danger" onclick="submitRejectReason()">Tolak</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ===== Pagination ===== -->
 {% if pagination.pages > 1 %}

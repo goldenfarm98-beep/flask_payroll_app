@@ -6,13 +6,19 @@ services:
     container_name: flask_payroll_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: payroll
-      POSTGRES_PASSWORD: payroll
-      POSTGRES_DB: payroll
+      POSTGRES_USER: ${POSTGRES_USER:-payroll}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payroll}
+      POSTGRES_DB: ${POSTGRES_DB:-payroll}
+      TZ: ${TZ:-Asia/Jakarta}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payroll} -d ${POSTGRES_DB:-payroll}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
