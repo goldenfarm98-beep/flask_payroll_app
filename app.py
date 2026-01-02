@@ -24,8 +24,10 @@ from flask import request
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
+from dotenv import load_dotenv
 
 
+load_dotenv()
 app = Flask(__name__)
 
 # SECRET_KEY untuk session
